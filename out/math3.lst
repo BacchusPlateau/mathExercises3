@@ -9,224 +9,226 @@ Source: equates.asm
      5 = 0055			colcrs      = $55                       ; CONSTANT: colcrs = $55 (OS zero page address that controls cursor column)
      6 = 0030			offset_to_char = $30                    ; Offset from integer literal to ATASCII character equivalent of the number
      7 = 009B			new_line    = $9B 
-     8
-     9 				; graphics variables and constants
-    10 = 0080			plotX_lo    = $80       ; low byte of X coordinate (0-319 needs 2 bytes!)
-    11 = 0081			plotX_hi    = $81       ; high byte of X coordinate
-    12 = 0082			plotY       = $82       ; Y coordinate (0-191, fits in one byte)
-    13 = 0083			temp_lo     = $83       ; temporary storage low byte
-    14 = 0084			temp_hi     = $84       ; temporary storage high byte
-    15 = 0085			scrptr_lo   = $85       ; calculated screen address low byte
-    16 = 0086			scrptr_hi   = $86       ; calculated screen address high byte
-    17 = 0087			save_lo     = $87       ; saved plotY × 8 low byte
-    18 = 0088			save_hi     = $88       ; saved plotY × 8 high byte
-    19 = 0089			bitpos      = $89       ; bit position within byte (plotX mod 8) that our pixel lives in
-    20 = 008A			bitmask     = $8A       ; save our mask that we will use to turn ONLY our pixel on
-    21
-    22 = 008B			strptr_lo   = $8B                       ; low byte of string address
-    23 = 008C			strptr_hi   = $8C                       ; high byte of string address
-    24
-    25 				; drawLine variables
-    26 = 008D			x1      = $8D       ; start X low byte
-    27 = 008E			x1_hi   = $8E       ; start X high byte
-    28 = 008F			y1      = $8F       ; start Y
-    29 = 0090			x2      = $90       ; end X low byte
-    30 = 0091			x2_hi   = $91       ; end X high byte
-    31 = 0092			y2      = $92       ; end Y
-    32 = 0093			dx_lo   = $93       ; delta X low byte
-    33 = 0094			dx_hi   = $94       ; delta X high byte
-    34 = 0095			dy      = $95       ; delta Y
-    35 = 0096			err_lo  = $96       ; error accumulator low byte
-    36 = 0097			err_hi  = $97       ; error accumulator high byte
-    37
-    38 				; drawCircle variables
-    39 = 009B			cx      = $9B       ; center X low byte
-    40 = 009C			cx_hi   = $9C       ; center X high byte
-    41 = 009D			cy      = $9D       ; center Y
-    42 = 009E			radius  = $9E       ; circle radius
-    43 = 009F			circX   = $9F       ; current x offset (starts at 0)
-    44 = 00A0			circY   = $A0       ; current y offset (starts at radius)
-    45 = 00A1			cerr_lo = $A1       ; error term low byte (signed)
-    46 = 00A2			cerr_hi = $A2       ; error term high byte
-    47
-    48 				; print16bit variables
-    49 = 00A3			p16_val_lo  = $A3       ; 16-bit value to print low byte
-    50 = 00A4			p16_val_hi  = $A4       ; 16-bit value to print high byte
-    51 = 00A5			p16_digit   = $A5       ; current digit counter
-    52
-    53 				; GR.8 color registers
-    54 = 02C5			COLPF1  = $02C5     ; foreground pixel color shadow
-    55 = 02C6			COLPF2  = $02C6     ; background color shadow
-    56 = 02C8			COLBK   = $02C8     ; border color shadow
-    57
-    58 = 00A6			spritePtr_lo = $A6      ; pointer into sprite data, advances each byte
-    59 = 00A7			spritePtr_hi = $A7
-    60 = 00A8			spriteByte   = $A8      ; current byte being tested
-    61 = 00A9			spriteMask   = $A9      ; current bit mask (shifts right each test)
-    62 = 00AA			spriteRow    = $AA      ; current row (0-11)
-    63 = 00AB			columnBase   = $AB      ; 0 or 8 depending on which byte in the row
-    64 = 00AC			byteCount    = $AC      ; 0-23, total byte counter
-    65 = 00AD			baseX_lo     = $AD      ; ship's starting X (saved so we can recompute each pixel)
-    66 = 00AE			baseX_hi     = $AE
-    67 = 00AF			baseY        = $AF      ; ship's starting Y
-    68 = 00B0			bitCounter   = $B0
-    69
-    70 				; =====================================================================
-    71 				; CIO (Central I/O) constants
-    72 				; CIO is the Atari OS I/O system. We use it to open graphics mode.
-    73 				; Each I/O channel uses an IOCB (I/O Control Block) — a fixed block
-    74 				; of memory containing command, device, buffer address, and aux bytes.
-    75 				; We use IOCB6 (base address $0360) for graphics.
-    76 				; X register = $60 tells CIOV which IOCB to use (IOCB6).
-    77 				; =====================================================================
-    78 = E456			CIOV    = $E456     ; OS CIO entry point — call jsr CIOV to execute
-    79 = 0342			ICCOM   = $0342     ; IOCB6 command register
-    80 				                    ;   $03 = OPEN   (open a device)
-    81 				                    ;   $0C = CLOSE  (close a device)
-    82 = 0344			ICBAL   = $0344     ; IOCB6 buffer address low byte
-    83 				                    ;   for OPEN: points to device name string "S:"
-    84 = 0345			ICBAH   = $0345     ; IOCB6 buffer address high byte
-    85 				                    ;   together with ICBAL forms 16-bit pointer to "S:"
-    86 = 034A			ICAX1   = $034A     ; IOCB6 auxiliary byte 1
-    87 				                    ;   for OPEN: $0C = read/write access mode
-    88 = 034B			ICAX2   = $034B     ; IOCB6 auxiliary byte 2
-    89 				                    ;   for OPEN: graphics mode number (8 = GR.8)
-    90
-    91 				; =====================================================================
-    92 				; Screen RAM pointer
-    93 				; After CIO opens GR.8, the OS stores the address of screen RAM
-    94 				; in SAVMSC (two bytes). $58 = low byte, $59 = high byte.
-    95 				; On our 800XL PAL system screen RAM ends up at $B060.
-    96 				; =====================================================================
-    97 = 0058			SAVMSC  = $58       ; zero page address — low byte of screen RAM address
-    98 				                    ; $59 automatically contains the high byte
-    99
-   100 				; =====================================================================
-   101 				; Attract mode constants
-   102 				; The Atari OS has an attract mode that kicks in after inactivity
-   103 				; to prevent screen burn-in. It does this by desaturating all colors
-   104 				; making everything appear as shades of grey/blue.
-   105 				; We must continuously reset these in our main loop to keep colors!
-   106 				; =====================================================================
-   107 = 004D			ATRACT  = $4D       ; attract mode counter — OS increments this each frame
-   108 				                    ; when it reaches a threshold attract mode activates
-   109 				                    ; we keep writing 0 to prevent it from activating
-   110 = 004E			ATRMSK  = $4E       ; attract mode color mask
-   111 				                    ; OS ANDs all colors with this value
-   112 				                    ; $FE strips hue leaving only luminance (grey/blue)
-   113 				                    ; $FF = full color (no masking) — what we want
-   114
-   115 				; =====================================================================
-   116 				; Player-Missile Graphics (PMG) constants
-   117 				; PMG is dedicated GTIA/ANTIC hardware for moving sprites — completely
-   118 				; separate from the GR.8 bitmap screen RAM we've been drawing into.
-   119 				; ANTIC reads this memory automatically every frame and GTIA overlays
-   120 				; it on top of the playfield, with zero CPU cost for the overlay itself.
-   121 				; =====================================================================
-   122
-   123 = 5000			PMBASE  = $5000     ; start of our PM memory block. MUST be page-aligned
-   124 				                    ; (low byte = $00) because ANTIC only stores a HIGH
-   125 				                    ; byte pointer to this memory — there's no low byte
-   126 				                    ; register, so the low byte is implicitly always $00
-   127
-   128 				; --- OS shadow registers (same pattern as SDMCTL/SDLSTL we already use) ---
-   129 = D407			PMBASE_SHADOW = $D407   ; hardware register: tells ANTIC the HIGH byte
-   130 				                        ; of where PM memory starts (PMBASE ÷ 256)
-   131 				                        ; NOTE: unlike SDMCTL, there's no safe OS shadow
-   132 				                        ; register for this one — we write directly to
-   133 				                        ; hardware, similar to how we had to fight
-   134 				                        ; attract mode by writing hardware directly
-   135
-   136 = D01D			GRACTL  = $D01D     ; GTIA register — Graphics Control
-   137 				                    ; controls whether players/missiles are displayed
-   138 				                    ; at all, and whether collision detection is active
-   139 				                    ; bit 0 = enable missile graphics
-   140 				                    ; bit 1 = enable player graphics
-   141 				                    ; bit 2 = enable latching (collision detection mode)
-   142
-   143 				; --- Player 0 hardware registers ---
-   144 = D000			HPOSP0  = $D000     ; horizontal position of Player 0 (one byte!)
-   145 = D004			HPOSM0  = $D004     ; horizontal position of Missile 0 (own register,
-   146 				                    ; independent of HPOSP0)
-   147 				                    ; THIS is the magic register — changing this one
-   148 				                    ; byte instantly moves the sprite left/right with
-   149 				                    ; no redraw needed at all, unlike our manual sprite
-   150 = D008			SIZEP0  = $D008     ; width of Player 0: 0=normal, 1=double, 3=quad width
-   151 = D012			COLPM0  = $D012     ; color of Player 0 (shadow: $02C0)
-   152
-   153 				; --- DMACTL bit for enabling PM DMA (added to what openGR8 already sets) ---
-   154 				; DMACTL is the SAME register as SDMCTL we already use in openGR8 —
-   155 				; PM graphics needs an ADDITIONAL bit set on top of what we already
-   156 				; configure for the playfield, not a separate register
-   157 = 0010			PMG_ENABLE_BIT = %00010000   ; bit 4 of SDMCTL enables single-line
-   158 				                            ; resolution PM DMA (we'll OR this into
-   159 				                            ; whatever openGR8 already sets)
-   160 = 022F			SDMCTL  = $022F     ; OS shadow register for DMA control — CIO already
-   161 				                    ; writes the correct playfield bits here when
-   162 				                    ; opening a graphics mode; we OR in our PM bit
-   163 				                    ; on top of whatever CIO set, rather than guessing                                            
-   164
-   165
-   166 				; --- Corrected per bumbershootsoft.wordpress.com reference ---
-   167 = 026F			GPRIOR  = $026F     ; shadow for PRIOR ($D01B) — priority/5-player mode
-   168 				                    ; not strictly needed for a single player test,
-   169 				                    ; but useful to know about going forward
-   170
-   171 = 002E			PMG_DMACTL_VALUE = $2E    ; full correct DMACTL value, not just one bit:
-   172 				                          ; bits 0-1 = playfield width (2 = normal)
-   173 				                          ; bit 2 = missile DMA enable
-   174 				                          ; bit 3 = player DMA enable
-   175 				                          ; bit 5 = display list DMA enable (needed
-   176 				                          ;         for ANY playfield to show at all!)                    
-   177
-   178 = 00B1			shipX = $B1        ; sprite 0 current X position
-   179 = 00B2			shipY = $B2        ; sprite 0 current Y position
-   180 = 00B3			walkFrame = $B3    ; increments on ANY movement (either axis) — drives
-   181 				                   ; which walk-cycle frame shows, independent of
-   182 				                   ; shipX/shipY themselves
-   183 = 00B4			prevTrig = $B4     ; STRIG0's value AS OF LAST FRAME — compare against
-   184 				                   ; the current STRIG0 read to detect a NEW press
-   185 				                   ; (edge), not just "currently held"
-   186 = 00B5			eggX = $B5         ; egg missile's current X position (set once at
-   187 				                   ; launch, doesn't change mid-flight)
-   188 = 00B6			eggY = $B6         ; egg missile's current Y position — same
-   189 				                   ; "0 = top of playfield" convention as shipY
-   190 = 00B7			eggActive = $B7    ; 0 = no egg in flight, 1 = egg airborne, keep
-   191 				                   ; updating/drawing it each loop pass
-   192 = 00B8			lastDir = $B8      ; duck's most recent movement direction — updated
-   193 				                   ; in every direction branch, default 0 (Up) so a
-   194 				                   ; duck that's never moved fires upward
-   195 = 00B9			eggDir = $B9       ; egg's direction, frozen from lastDir at the
-   196 				                   ; moment it's launched — doesn't change mid-flight
-   197 				                   ; even if the duck changes direction afterward
-   198
-   199 				; direction codes shared by lastDir/eggDir
-   200 = 0000			DIR_UP    = 0
-   201 = 0001			DIR_DOWN  = 1
-   202 = 0002			DIR_LEFT  = 2
-   203 = 0003			DIR_RIGHT = 3
-   204
-   205 				; egg travel bounds — rough screen edges, not pixel-precise
-   206 = 0014			EGG_X_MIN = 20
-   207 = 00DC			EGG_X_MAX = 220
-   208 = 005F			EGG_Y_MAX = 95
-   209 = 0003			EGG_SPEED = 3      ; units per pass — duck moves 1/pass, so this
-   210 				                   ; makes the egg visibly outrun it
-   211
-   212 				; missile memory is $0180 within the PM block, shared by all 4
-   213 				; missiles — only bits 0-1 of each byte belong to missile 0
-   214 = 5190			MISSILE_BASE = PMBASE+$0180+16   ; the +16 visible-top alignment applies
-   215 				                                 ; to the whole PM block, not just
-   216 				                                 ; players \xe2\x80\x94 this was missing before
-   217 = 0006			EGG_FRAME_LEN = 6
-   218 				; =====================================================================
-   219 				; Joystick input
-   220 				; The OS polls the joystick hardware every frame and stores the
-   221 				; debounced result here for us — no need to touch the PIA directly.
-   222 				; =====================================================================
-   223 = 0278			STICK0  = $0278     ; joystick 1 direction bits, ACTIVE LOW (0=pressed):
-   224 				                    ; bit 0 = Up, bit 1 = Down, bit 2 = Left, bit 3 = Right
-   225 = 0284			STRIG0  = $0284     ; joystick 1 fire button, ACTIVE LOW (0=pressed)
+     8 = 0059			y_char = $59
+     9 = 004E			n_char = $4E
+    10
+    11 				; graphics variables and constants
+    12 = 0080			plotX_lo    = $80       ; low byte of X coordinate (0-319 needs 2 bytes!)
+    13 = 0081			plotX_hi    = $81       ; high byte of X coordinate
+    14 = 0082			plotY       = $82       ; Y coordinate (0-191, fits in one byte)
+    15 = 0083			temp_lo     = $83       ; temporary storage low byte
+    16 = 0084			temp_hi     = $84       ; temporary storage high byte
+    17 = 0085			scrptr_lo   = $85       ; calculated screen address low byte
+    18 = 0086			scrptr_hi   = $86       ; calculated screen address high byte
+    19 = 0087			save_lo     = $87       ; saved plotY × 8 low byte
+    20 = 0088			save_hi     = $88       ; saved plotY × 8 high byte
+    21 = 0089			bitpos      = $89       ; bit position within byte (plotX mod 8) that our pixel lives in
+    22 = 008A			bitmask     = $8A       ; save our mask that we will use to turn ONLY our pixel on
+    23
+    24 = 008B			strptr_lo   = $8B                       ; low byte of string address
+    25 = 008C			strptr_hi   = $8C                       ; high byte of string address
+    26
+    27 				; drawLine variables
+    28 = 008D			x1      = $8D       ; start X low byte
+    29 = 008E			x1_hi   = $8E       ; start X high byte
+    30 = 008F			y1      = $8F       ; start Y
+    31 = 0090			x2      = $90       ; end X low byte
+    32 = 0091			x2_hi   = $91       ; end X high byte
+    33 = 0092			y2      = $92       ; end Y
+    34 = 0093			dx_lo   = $93       ; delta X low byte
+    35 = 0094			dx_hi   = $94       ; delta X high byte
+    36 = 0095			dy      = $95       ; delta Y
+    37 = 0096			err_lo  = $96       ; error accumulator low byte
+    38 = 0097			err_hi  = $97       ; error accumulator high byte
+    39
+    40 				; drawCircle variables
+    41 = 009B			cx      = $9B       ; center X low byte
+    42 = 009C			cx_hi   = $9C       ; center X high byte
+    43 = 009D			cy      = $9D       ; center Y
+    44 = 009E			radius  = $9E       ; circle radius
+    45 = 009F			circX   = $9F       ; current x offset (starts at 0)
+    46 = 00A0			circY   = $A0       ; current y offset (starts at radius)
+    47 = 00A1			cerr_lo = $A1       ; error term low byte (signed)
+    48 = 00A2			cerr_hi = $A2       ; error term high byte
+    49
+    50 				; print16bit variables
+    51 = 00A3			p16_val_lo  = $A3       ; 16-bit value to print low byte
+    52 = 00A4			p16_val_hi  = $A4       ; 16-bit value to print high byte
+    53 = 00A5			p16_digit   = $A5       ; current digit counter
+    54
+    55 				; GR.8 color registers
+    56 = 02C5			COLPF1  = $02C5     ; foreground pixel color shadow
+    57 = 02C6			COLPF2  = $02C6     ; background color shadow
+    58 = 02C8			COLBK   = $02C8     ; border color shadow
+    59
+    60 = 00A6			spritePtr_lo = $A6      ; pointer into sprite data, advances each byte
+    61 = 00A7			spritePtr_hi = $A7
+    62 = 00A8			spriteByte   = $A8      ; current byte being tested
+    63 = 00A9			spriteMask   = $A9      ; current bit mask (shifts right each test)
+    64 = 00AA			spriteRow    = $AA      ; current row (0-11)
+    65 = 00AB			columnBase   = $AB      ; 0 or 8 depending on which byte in the row
+    66 = 00AC			byteCount    = $AC      ; 0-23, total byte counter
+    67 = 00AD			baseX_lo     = $AD      ; ship's starting X (saved so we can recompute each pixel)
+    68 = 00AE			baseX_hi     = $AE
+    69 = 00AF			baseY        = $AF      ; ship's starting Y
+    70 = 00B0			bitCounter   = $B0
+    71
+    72 				; =====================================================================
+    73 				; CIO (Central I/O) constants
+    74 				; CIO is the Atari OS I/O system. We use it to open graphics mode.
+    75 				; Each I/O channel uses an IOCB (I/O Control Block) — a fixed block
+    76 				; of memory containing command, device, buffer address, and aux bytes.
+    77 				; We use IOCB6 (base address $0360) for graphics.
+    78 				; X register = $60 tells CIOV which IOCB to use (IOCB6).
+    79 				; =====================================================================
+    80 = E456			CIOV    = $E456     ; OS CIO entry point — call jsr CIOV to execute
+    81 = 0342			ICCOM   = $0342     ; IOCB6 command register
+    82 				                    ;   $03 = OPEN   (open a device)
+    83 				                    ;   $0C = CLOSE  (close a device)
+    84 = 0344			ICBAL   = $0344     ; IOCB6 buffer address low byte
+    85 				                    ;   for OPEN: points to device name string "S:"
+    86 = 0345			ICBAH   = $0345     ; IOCB6 buffer address high byte
+    87 				                    ;   together with ICBAL forms 16-bit pointer to "S:"
+    88 = 034A			ICAX1   = $034A     ; IOCB6 auxiliary byte 1
+    89 				                    ;   for OPEN: $0C = read/write access mode
+    90 = 034B			ICAX2   = $034B     ; IOCB6 auxiliary byte 2
+    91 				                    ;   for OPEN: graphics mode number (8 = GR.8)
+    92
+    93 				; =====================================================================
+    94 				; Screen RAM pointer
+    95 				; After CIO opens GR.8, the OS stores the address of screen RAM
+    96 				; in SAVMSC (two bytes). $58 = low byte, $59 = high byte.
+    97 				; On our 800XL PAL system screen RAM ends up at $B060.
+    98 				; =====================================================================
+    99 = 0058			SAVMSC  = $58       ; zero page address — low byte of screen RAM address
+   100 				                    ; $59 automatically contains the high byte
+   101
+   102 				; =====================================================================
+   103 				; Attract mode constants
+   104 				; The Atari OS has an attract mode that kicks in after inactivity
+   105 				; to prevent screen burn-in. It does this by desaturating all colors
+   106 				; making everything appear as shades of grey/blue.
+   107 				; We must continuously reset these in our main loop to keep colors!
+   108 				; =====================================================================
+   109 = 004D			ATRACT  = $4D       ; attract mode counter — OS increments this each frame
+   110 				                    ; when it reaches a threshold attract mode activates
+   111 				                    ; we keep writing 0 to prevent it from activating
+   112 = 004E			ATRMSK  = $4E       ; attract mode color mask
+   113 				                    ; OS ANDs all colors with this value
+   114 				                    ; $FE strips hue leaving only luminance (grey/blue)
+   115 				                    ; $FF = full color (no masking) — what we want
+   116
+   117 				; =====================================================================
+   118 				; Player-Missile Graphics (PMG) constants
+   119 				; PMG is dedicated GTIA/ANTIC hardware for moving sprites — completely
+   120 				; separate from the GR.8 bitmap screen RAM we've been drawing into.
+   121 				; ANTIC reads this memory automatically every frame and GTIA overlays
+   122 				; it on top of the playfield, with zero CPU cost for the overlay itself.
+   123 				; =====================================================================
+   124
+   125 = 5000			PMBASE  = $5000     ; start of our PM memory block. MUST be page-aligned
+   126 				                    ; (low byte = $00) because ANTIC only stores a HIGH
+   127 				                    ; byte pointer to this memory — there's no low byte
+   128 				                    ; register, so the low byte is implicitly always $00
+   129
+   130 				; --- OS shadow registers (same pattern as SDMCTL/SDLSTL we already use) ---
+   131 = D407			PMBASE_SHADOW = $D407   ; hardware register: tells ANTIC the HIGH byte
+   132 				                        ; of where PM memory starts (PMBASE ÷ 256)
+   133 				                        ; NOTE: unlike SDMCTL, there's no safe OS shadow
+   134 				                        ; register for this one — we write directly to
+   135 				                        ; hardware, similar to how we had to fight
+   136 				                        ; attract mode by writing hardware directly
+   137
+   138 = D01D			GRACTL  = $D01D     ; GTIA register — Graphics Control
+   139 				                    ; controls whether players/missiles are displayed
+   140 				                    ; at all, and whether collision detection is active
+   141 				                    ; bit 0 = enable missile graphics
+   142 				                    ; bit 1 = enable player graphics
+   143 				                    ; bit 2 = enable latching (collision detection mode)
+   144
+   145 				; --- Player 0 hardware registers ---
+   146 = D000			HPOSP0  = $D000     ; horizontal position of Player 0 (one byte!)
+   147 = D004			HPOSM0  = $D004     ; horizontal position of Missile 0 (own register,
+   148 				                    ; independent of HPOSP0)
+   149 				                    ; THIS is the magic register — changing this one
+   150 				                    ; byte instantly moves the sprite left/right with
+   151 				                    ; no redraw needed at all, unlike our manual sprite
+   152 = D008			SIZEP0  = $D008     ; width of Player 0: 0=normal, 1=double, 3=quad width
+   153 = D012			COLPM0  = $D012     ; color of Player 0 (shadow: $02C0)
+   154
+   155 				; --- DMACTL bit for enabling PM DMA (added to what openGR8 already sets) ---
+   156 				; DMACTL is the SAME register as SDMCTL we already use in openGR8 —
+   157 				; PM graphics needs an ADDITIONAL bit set on top of what we already
+   158 				; configure for the playfield, not a separate register
+   159 = 0010			PMG_ENABLE_BIT = %00010000   ; bit 4 of SDMCTL enables single-line
+   160 				                            ; resolution PM DMA (we'll OR this into
+   161 				                            ; whatever openGR8 already sets)
+   162 = 022F			SDMCTL  = $022F     ; OS shadow register for DMA control — CIO already
+   163 				                    ; writes the correct playfield bits here when
+   164 				                    ; opening a graphics mode; we OR in our PM bit
+   165 				                    ; on top of whatever CIO set, rather than guessing                                            
+   166
+   167
+   168 				; --- Corrected per bumbershootsoft.wordpress.com reference ---
+   169 = 026F			GPRIOR  = $026F     ; shadow for PRIOR ($D01B) — priority/5-player mode
+   170 				                    ; not strictly needed for a single player test,
+   171 				                    ; but useful to know about going forward
+   172
+   173 = 002E			PMG_DMACTL_VALUE = $2E    ; full correct DMACTL value, not just one bit:
+   174 				                          ; bits 0-1 = playfield width (2 = normal)
+   175 				                          ; bit 2 = missile DMA enable
+   176 				                          ; bit 3 = player DMA enable
+   177 				                          ; bit 5 = display list DMA enable (needed
+   178 				                          ;         for ANY playfield to show at all!)                    
+   179
+   180 = 00B1			shipX = $B1        ; sprite 0 current X position
+   181 = 00B2			shipY = $B2        ; sprite 0 current Y position
+   182 = 00B3			walkFrame = $B3    ; increments on ANY movement (either axis) — drives
+   183 				                   ; which walk-cycle frame shows, independent of
+   184 				                   ; shipX/shipY themselves
+   185 = 00B4			prevTrig = $B4     ; STRIG0's value AS OF LAST FRAME — compare against
+   186 				                   ; the current STRIG0 read to detect a NEW press
+   187 				                   ; (edge), not just "currently held"
+   188 = 00B5			eggX = $B5         ; egg missile's current X position (set once at
+   189 				                   ; launch, doesn't change mid-flight)
+   190 = 00B6			eggY = $B6         ; egg missile's current Y position — same
+   191 				                   ; "0 = top of playfield" convention as shipY
+   192 = 00B7			eggActive = $B7    ; 0 = no egg in flight, 1 = egg airborne, keep
+   193 				                   ; updating/drawing it each loop pass
+   194 = 00B8			lastDir = $B8      ; duck's most recent movement direction — updated
+   195 				                   ; in every direction branch, default 0 (Up) so a
+   196 				                   ; duck that's never moved fires upward
+   197 = 00B9			eggDir = $B9       ; egg's direction, frozen from lastDir at the
+   198 				                   ; moment it's launched — doesn't change mid-flight
+   199 				                   ; even if the duck changes direction afterward
+   200
+   201 				; direction codes shared by lastDir/eggDir
+   202 = 0000			DIR_UP    = 0
+   203 = 0001			DIR_DOWN  = 1
+   204 = 0002			DIR_LEFT  = 2
+   205 = 0003			DIR_RIGHT = 3
+   206
+   207 				; egg travel bounds — rough screen edges, not pixel-precise
+   208 = 0014			EGG_X_MIN = 20
+   209 = 00DC			EGG_X_MAX = 220
+   210 = 005F			EGG_Y_MAX = 95
+   211 = 0003			EGG_SPEED = 3      ; units per pass — duck moves 1/pass, so this
+   212 				                   ; makes the egg visibly outrun it
+   213
+   214 				; missile memory is $0180 within the PM block, shared by all 4
+   215 				; missiles — only bits 0-1 of each byte belong to missile 0
+   216 = 5190			MISSILE_BASE = PMBASE+$0180+16   ; the +16 visible-top alignment applies
+   217 				                                 ; to the whole PM block, not just
+   218 				                                 ; players \xe2\x80\x94 this was missing before
+   219 = 0006			EGG_FRAME_LEN = 6
+   220 				; =====================================================================
+   221 				; Joystick input
+   222 				; The OS polls the joystick hardware every frame and stores the
+   223 				; debounced result here for us — no need to touch the PIA directly.
+   224 				; =====================================================================
+   225 = 0278			STICK0  = $0278     ; joystick 1 direction bits, ACTIVE LOW (0=pressed):
+   226 				                    ; bit 0 = Up, bit 1 = Down, bit 2 = Left, bit 3 = Right
+   227 = 0284			STRIG0  = $0284     ; joystick 1 fire button, ACTIVE LOW (0=pressed)
      2 				        icl 'routines.asm'
 Source: routines.asm
      1 				; routines.asm
@@ -1684,7 +1686,7 @@ Source: routines.asm
   1453 3607			print_array_loop:
   1454 3607 8A			        txa                             ; a = x
   1455 3608 85 8D		        sta x1                          ; save x to x1 via a
-  1456 360A BD 40 20		        lda evens,x                   ; a = numbers[x]
+  1456 360A BD 35 20		        lda evens,x                   ; a = numbers[x]
   1457 				        
   1458 360D 20 6E 35		        jsr printDecimal                ; print a
   1459 3610 A9 9B		        lda #$9B                        ; a = newline character
@@ -1715,66 +1717,124 @@ Source: routines.asm
      5 				 
      6 2000			        .proc main
      7 				 
-     8 2000-2047> A9 01 8D F0 +         mva #1 csrhinh                  ; turn cursor off
+     8 2000-203C> A9 01 8D F0 +         mva #1 csrhinh                  ; turn cursor off
      9 2005 A9 01 85 54		        mva #1 rowcrs                   ; start printing at row 1
     10 2009 A9 02 85 55		        mva #2 colcrs                   ; start printing at col 1
     11
-    12 				        ;jsr printBigDecimal
-    13
-    14 				        ;jsr printArray
-    15 				        ;jmp stop
-    16
-    17 200D A2 00		        ldx #0                          ; x=0
-    18 200F A9 00 85 83		        mva #0 temp_lo                  ; temp_lo=0
-    19 2013 A9 00 85 84		        mva #0 temp_hi                  ; temp_hi=0
-    20
-    21 2017			probOne:
-    22 2017 BD 40 20		        lda evens,x                     ; a=evens[x]
-    23 201A 18			        clc                             ; clear carry
-    24 201B 65 83		        adc temp_lo                     ; a+=temp_lo
-    25 201D 85 83		        sta temp_lo                     ; temp_lo=a
-    26 201F E8			        inx                             ; x++
-    27 2020 E0 08		        cpx #.len evens
-    28 2022 D0 F3		        bne probOne
-    29 				        ; we've now got how many elements are in the array in x
-    30 				        ; the sum of the array is in temp_lo
-    31 2024 8A			        txa                             ; a=x
-    32 2025 A2 00		        ldx #0                          ; x=0 (we're using it now for # of times we can subtract)
-    33 2027 85 A3		        sta p16_val_lo                  ; p16_val_lo=x (the length of the array evens)
-    34
-    35 				        ;jsr printDecimal
-    36 				        ;jmp stop
-    37
-    38 				        ; iteratively subtract the array count from the sum until we go negative
-    39 2029			probOneDivide:
-    40 2029 A5 83		        lda temp_lo                     ; a=temp_lo (the sum of the array)
-    41 202B 38			        sec                             ; set carry
-    42 202C E5 A3		        sbc p16_val_lo                  ; a-=p16_val_lo (subtract the length of the array)
-    43 202E 85 83		        sta temp_lo                     ; a=p16_val_lo (store reduced sum in a)
-    44 2030 30 04		        bmi probOneNegative             ; branch if we've gone negative
-    45 2032 E8			        inx                             ; x++
-    46 2033 4C 29 20		        jmp probOneDivide
-    47 2036			probOneNegative:
-    48 2036 8A			        txa                             ; a=x
-    49 2037 20 6E 35		        jsr printDecimal
+    12 				; problem one
+    13 				; Running average (rounded down)
+    14 				; Given a byte table of values, compute their average — sum all the values, 
+    15 				; then repeatedly subtract the count until you can't anymore, counting how many 
+    16 				; times you subtracted. That gives you quotient = average. Print it. 
+    17 				; (This is the same repeated-subtraction trick as `printDecimal`, 
+    18 				; just with a variable divisor instead of 10.)
+    19
+    20 				 ;       ldx #0                          ; x=0
+    21 				 ;       mva #0 temp_lo                  ; temp_lo=0
+    22
+    23 				;probOne:
+    24 				;        lda evens,x                     ; a=evens[x]
+    25 				;        clc                             ; clear carry
+    26 				;        adc temp_lo                     ; a+=temp_lo
+    27 				;        sta temp_lo                     ; temp_lo=a
+    28 				;        inx                             ; x++
+    29 				;        cpx #.len evens
+    30 				;        bne probOne
+    31 				        ; we've now got how many elements are in the array in x
+    32 				        ; the sum of the array is in temp_lo
+    33 				;        txa                             ; a=x
+    34 				;        ldx #0                          ; x=0 (we're using it now for # of times we can subtract)
+    35 				;        sta p16_val_lo                  ; p16_val_lo=x (the length of the array evens)
+    36
+    37 				;        ; iteratively subtract the array count from the sum until we go negative
+    38 				;probOneDivide:
+    39 				;        lda temp_lo                     ; a=temp_lo (the sum of the array)
+    40 				;        sec                             ; set carry
+    41 				;        sbc p16_val_lo                  ; a-=p16_val_lo (subtract the length of the array)
+    42 				;        sta temp_lo                     ; a=p16_val_lo (store reduced sum in a)
+    43 				;        bmi probOneNegative             ; branch if we've gone negative
+    44 				;        inx                             ; x++
+    45 				;        jmp probOneDivide               ; keep subtracting
+    46 				;probOneNegative:
+    47 				 ;       txa                             ; a=x
+    48 				 ;       jsr printDecimal                ; print the integer division
+    49
     50
-    51 				        
-    52 203A			stop:
-    53 203A 20 7D 33		        jsr fightAttract
-    54 203D 4C 3A 20		        jmp stop
-    55
+    51 				;========================================================================================
+    52 				; **2. Negate all values in an array**
+    53 				; Given a table of small positive numbers, replace every value in-place with its two's 
+    54 				; complement negation — i.e. `256 - value`. The 6502 idiom for this is `eor #$FF` followed 
+    55 				; by `clc` / `adc #1` (flip all bits, then add 1). Verify with `db` in Altirra before and after.
     56
-    57 				        .endp
-    58 				 
-    59 				 
-    60 				 
-    61
-    62 				; Data section
-    63 				;===================================================================
+    57 				;        lda #new_line
+    58 				;        jsr putchar
+    59
+    60 				;       lda #new_line
+    61 				;       jsr putchar
+    62
+    63 				;        jsr printArray
     64
-    65 2040			        .local evens
-    66 2040 02 04 06 08 0A 0C +         .byte 2, 4, 6, 8, 10, 12, 14, 16
-    67 				        .endl
-    68
-    69 				     
-    70 02E0-02E1> 00 20		        run main
+    65 				;        ldx #0                          ; x=0
+    66
+    67 				;probTwo:
+    68 				;        lda evens,x                     ; a=evens[x] 
+    69 				;        eor #%11111111                   ; a=a xor (1111 1111)
+    70 				;        clc                             ; clear carry
+    71 				;        adc #1                          ; a+=1
+    72 				;        sta evens,X                     ; evens[x] = a
+    73 				;        inx                             ; x++
+    74 				;        cpx #.len evens                 ; x == len(evens)?
+    75 				;        bne probTwo                     ; branch if they are not equal
+    76
+    77 				;        lda #new_line
+    78 				;        jsr putchar
+    79
+    80 				;        jsr printArray
+    81
+    82 				; **3. Array contains a value (yes/no)**
+    83 				; Loop over a byte table searching for a specific target value. If found, print `Y`; 
+    84 				; if you reach the end without finding it, print `N`. The twist: you need to print 
+    85 				; the result *after* the loop regardless of which exit path you took — think about 
+    86 				; how to carry a "found" flag out of the loop.
+    87 				; 
+    88 				; We will put the value to find in temp_hi
+    89 				; We will put the output character (Y/N) in temp_lo
+    90
+    91 200D A2 00		        ldx #0                          ; x=0
+    92 200F A9 10 85 84		        mva #16 temp_hi                  ; temp_hi=8 (target value)
+    93 2013 A9 4E 85 83		        mva #n_char temp_lo              ; temp_lo = n_char (default to N)
+    94
+    95 2017			probThree:
+    96 2017 BD 35 20		        lda evens,x                     ; a=evens[x] 
+    97 201A C5 84		        cmp temp_hi
+    98 201C F0 03		        beq probThreeFound
+    99 201E 4C 25 20		        jmp probThreeNotFound
+   100 2021			probThreeFound:
+   101 2021 A9 59 85 83		        mva #y_char temp_lo
+   102 2025			probThreeNotFound:
+   103 2025 E8			        inx                             ; x++
+   104 2026 E0 08		        cpx #.len evens                 ; x == len(evens)?
+   105 2028 D0 ED		        bne probThree                   ; branch if they are not equal
+   106
+   107 202A A5 83		        lda temp_lo
+   108 202C 20 AA 34		        jsr putchar
+   109
+   110
+   111 202F			stop:
+   112 202F 20 7D 33		        jsr fightAttract
+   113 2032 4C 2F 20		        jmp stop
+   114
+   115 				        .endp
+   116 				 
+   117 				 
+   118 				 
+   119
+   120 				; Data section
+   121 				;===================================================================
+   122
+   123 2035			        .local evens
+   124 2035 02 04 06 08 0A 0C +         .byte 2, 4, 6, 8, 10, 12, 14, 16
+   125 				        .endl
+   126
+   127 				     
+   128 02E0-02E1> 00 20		        run main

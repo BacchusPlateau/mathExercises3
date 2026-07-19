@@ -5,6 +5,8 @@ rowcrs      = $54                       ; CONSTANT: rowcrs = $54 (OS zero page a
 colcrs      = $55                       ; CONSTANT: colcrs = $55 (OS zero page address that controls cursor column)
 offset_to_char = $30                    ; Offset from integer literal to ATASCII character equivalent of the number
 new_line    = $9B 
+y_char = $59
+n_char = $4E
 
 ; graphics variables and constants
 plotX_lo    = $80       ; low byte of X coordinate (0-319 needs 2 bytes!)
