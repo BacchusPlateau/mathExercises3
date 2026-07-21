@@ -104,13 +104,69 @@ probThreeNotFound:
         cpx #.len evens                 ; x == len(evens)?
         bne probThree                   ; branch if they are not equal
 
-        lda temp_lo
-        jsr putchar
+;        lda temp_lo
+;        jsr putchar
+
+;================================================================================
+; **4. Interleave two arrays into a third**
+; Given two same-length source arrays A and B, fill a destination buffer by alternating: 
+; `A[0], B[0], A[1], B[1], A[2], B[2]...` Verify with `db`. This extends the dual-index 
+; pattern from the reverse-copy exercise — now you're writing to a *third* index at double the pace of the two readers.
+
+; x will index evens and odds
+; y will index merged
+
+
+        ldx #0                          ; x=0
+        ldy #0                          ; y=0
+
+probFour:
+        lda odds,x                     ; a=evens[x] 
+        sta merged,y
+        iny
+        lda evens,x
+        sta merged,y
+        iny
+        inx
+        cpx #.len evens
+        bne probFour
+
+        ;jsr printArray
 
 
 
+;================================================================================
+; **5. Count how many values are in a range**
+; Given a byte table, count how many values fall between a low bound and a high bound 
+; (inclusive). Uses two `cmp`/`bcc`/`bcs` checks per element — a bit like a gate with 
+; two conditions that both have to pass. Print the count.
 
 
+        mva #5 temp_lo                  ; our lower bound will be 5, store in a zero page variable
+        mva #12 temp_hi                 ; our upper bound will be 12, store in a zero page variable
+        ldx #0                          ; index into our byte array evens { 2, 4, 6, 8, 10, 12, 14, 16 }
+        ldy #0                          ; counter how many we found in range
+
+probFive:
+        lda evens,x                     ; a=evens[x] 
+        cmp temp_lo                     ; a == temp_lo ?
+        bcc probFiveNext                ; a < temp_lo is below range, skip        
+        ; if we got here, a >= temp_lo, we must check temp_hi now
+        cmp temp_hi                     ; a == temp_hi ?
+        bcc probFiveGotOne              ; if a < temp_hi, we are in range
+        ; if we got here a >= templo and now have to check if a == temp_hi
+        bne probFiveNext                ; a != temp_hi
+
+probFiveGotOne:
+        iny                             ; y++
+
+probFiveNext:
+        inx                             ; x++
+        cpx #.len evens                 ; x==len(evens) ?
+        bne probFive                    ; x != len(evens)
+
+        tya                             ; a=y
+        jsr printDecimal                ; print the output (should be 4)
 
 stop:
         jsr fightAttract
@@ -128,5 +184,12 @@ stop:
         .byte 2, 4, 6, 8, 10, 12, 14, 16
         .endl
 
-     
+        .local odds
+        .byte 1, 3, 5, 7, 9, 11, 13, 15
+        .endl
+
+        .local merged
+        .byte 0, 0, 0, 0, 0,  0,  0,  0, 0, 0, 0, 0, 0,  0,  0,  0
+        .endl
+
         run main
