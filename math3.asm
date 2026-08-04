@@ -88,21 +88,21 @@
 ; We will put the value to find in temp_hi
 ; We will put the output character (Y/N) in temp_lo
 
-        ldx #0                          ; x=0
-        mva #16 temp_hi                  ; temp_hi=8 (target value)
-        mva #n_char temp_lo              ; temp_lo = n_char (default to N)
+;        ldx #0                          ; x=0
+;        mva #16 temp_hi                  ; temp_hi=8 (target value)
+;        mva #n_char temp_lo              ; temp_lo = n_char (default to N)
 
-probThree:
-        lda evens,x                     ; a=evens[x] 
-        cmp temp_hi
-        beq probThreeFound
-        jmp probThreeNotFound
-probThreeFound:
-        mva #y_char temp_lo
-probThreeNotFound:
-        inx                             ; x++
-        cpx #.len evens                 ; x == len(evens)?
-        bne probThree                   ; branch if they are not equal
+;probThree:
+;        lda evens,x                     ; a=evens[x] 
+;        cmp temp_hi
+;        beq probThreeFound
+;        jmp probThreeNotFound
+;probThreeFound:
+;        mva #y_char temp_lo
+;probThreeNotFound:
+;        inx                             ; x++
+;        cpx #.len evens                 ; x == len(evens)?
+;        bne probThree                   ; branch if they are not equal
 
 ;        lda temp_lo
 ;        jsr putchar
@@ -117,19 +117,19 @@ probThreeNotFound:
 ; y will index merged
 
 
-        ldx #0                          ; x=0
-        ldy #0                          ; y=0
+ ;       ldx #0                          ; x=0
+ ;       ldy #0                          ; y=0
 
-probFour:
-        lda odds,x                     ; a=evens[x] 
-        sta merged,y
-        iny
-        lda evens,x
-        sta merged,y
-        iny
-        inx
-        cpx #.len evens
-        bne probFour
+;probFour:
+;        lda odds,x                     ; a=evens[x] 
+;        sta merged,y
+;        iny
+;        lda evens,x
+;        sta merged,y
+;        iny
+;        inx
+;        cpx #.len evens
+;        bne probFour
 
         ;jsr printArray
 
@@ -142,31 +142,127 @@ probFour:
 ; two conditions that both have to pass. Print the count.
 
 
-        mva #5 temp_lo                  ; our lower bound will be 5, store in a zero page variable
-        mva #12 temp_hi                 ; our upper bound will be 12, store in a zero page variable
-        ldx #0                          ; index into our byte array evens { 2, 4, 6, 8, 10, 12, 14, 16 }
-        ldy #0                          ; counter how many we found in range
+ ;       mva #5 temp_lo                  ; our lower bound will be 5, store in a zero page variable
+ ;       mva #12 temp_hi                 ; our upper bound will be 12, store in a zero page variable
+ ;       ldx #0                          ; index into our byte array evens { 2, 4, 6, 8, 10, 12, 14, 16 }
+ ;       ldy #0                          ; counter how many we found in range
 
-probFive:
-        lda evens,x                     ; a=evens[x] 
-        cmp temp_lo                     ; a == temp_lo ?
-        bcc probFiveNext                ; a < temp_lo is below range, skip        
-        ; if we got here, a >= temp_lo, we must check temp_hi now
-        cmp temp_hi                     ; a == temp_hi ?
-        bcc probFiveGotOne              ; if a < temp_hi, we are in range
+;robFive:
+;        lda evens,x                     ; a=evens[x] 
+;        cmp temp_lo                     ; a == temp_lo ?
+;        bcc probFiveNext                ; a < temp_lo is below range, skip        
+;        ; if we got here, a >= temp_lo, we must check temp_hi now
+;        cmp temp_hi                     ; a == temp_hi ?
+;        bcc probFiveGotOne              ; if a < temp_hi, we are in range
         ; if we got here a >= templo and now have to check if a == temp_hi
-        bne probFiveNext                ; a != temp_hi
+;        bne probFiveNext                ; a != temp_hi
 
-probFiveGotOne:
-        iny                             ; y++
+;probFiveGotOne:
+;        iny                             ; y++
 
-probFiveNext:
-        inx                             ; x++
-        cpx #.len evens                 ; x==len(evens) ?
-        bne probFive                    ; x != len(evens)
+;probFiveNext:
+;        inx                             ; x++
+;        cpx #.len evens                 ; x==len(evens) ?
+;        bne probFive                    ; x != len(evens)
 
-        tya                             ; a=y
-        jsr printDecimal                ; print the output (should be 4)
+;        tya                             ; a=y
+;        ;jsr printDecimal                ; print the output (should be 4)
+
+;****************
+; find min value, where a byte array "mixed" is declared as:
+;        .local mixed
+;        .byte 15, 3, 2, 1, 3, 11, 13, 2
+;        .endl
+
+;        ldx #0                           ; x=0
+;        mva #254  temp_lo                ; temp_lo=254 (holds the least)
+;probUno:
+;        lda mixed,x                      ; a=mixed[x] 
+;        cmp temp_lo                      ; a == temp_lo 
+;        bcc probUnoFound                 ; a < temp_lo 
+ ;       jmp probUnoNext                  ; skip, a is NOT greater than temp_lo
+;probUnoFound:
+ ;       sta temp_lo                      ; temp_lo = a
+;robUnoNext:
+;        inx                              ; x++
+;        cpx #.len mixed                   ; x == len(mixed) ?
+;        bne probUno                      ; x != len(mixed)
+
+ ;       lda temp_lo                      ; a = temp_lo
+ ;       jsr printDecimal                 ; print a
+
+
+;=====================================================================
+; Count the set bits in a byte
+; Given a single byte value, count and display how many of its bits are 1.
+; You must not loop more than 8 times
+
+;        ldy #0                           ; y=0 (our count of bits set)
+;        ldx #0                           ; x=0 (we still start on the right most bit)
+;        lda #%01101111                  ; a=binary "#" denotes a literal value, not an address
+                                        ; "%" denotes a binary value
+;checkBit:
+;        asl                             ; left shift
+;        bcc skipThisBit                 ; if carry flag is clear, this bit was not 1
+;        iny                             ; y++, if we're here, carry flat was set
+;skipThisBit:
+;        inx                             ; x++
+;        cpx #8                          ; have we shifted 8 times?
+;        bne checkBit                    ; check the next bit if x !=8
+
+;        tya                             ; a=y
+;        jsr printDecimal                ; print a
+
+
+
+
+
+; Null terminated array
+; Process a byte array that ends with a $00 terminator instead of using 
+; .len. Loop until you read a $00, counting the non-zero values as you go. 
+; Use this array: 
+; .local evens
+; .byte 2, 4, 6, 8, 10, 12, 14, 16, 0 
+
+;        ldx #0                          ; x=0
+;        mva #0 temp_lo                  ; we will put the sum in temp_lo
+
+;keepAdding:
+;        lda evens, x                    ; a=evens[x]
+;        cmp #0                          ; a==0 ?
+;        beq stopAdding                  ; if a==0, branch
+;        clc                             ; clear the carry flag
+;        adc temp_lo                     ; a+=temp_lo
+;        sta temp_lo                     ; temp_lo=a
+;        inx                             ; x++
+;        jmp keepAdding                  ; branch 
+;stopAdding:
+;        lda temp_lo                     ; a=temp_lo
+;        jsr printDecimal                ; call print routine to print out the A register
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 stop:
         jsr fightAttract
@@ -181,15 +277,19 @@ stop:
 ;===================================================================
 
         .local evens
-        .byte 2, 4, 6, 8, 10, 12, 14, 16
+        .byte 2, 4, 6, 8, 10, 12, 14, 16, 0
         .endl
 
         .local odds
         .byte 1, 3, 5, 7, 9, 11, 13, 15
         .endl
 
+        .local mixed
+        .byte 15, 3, 2, 1, 3, 11, 13, 2
+        .endl
+
         .local merged
-        .byte 0, 0, 0, 0, 0,  0,  0,  0, 0, 0, 0, 0, 0,  0,  0,  0
+        .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         .endl
 
         run main

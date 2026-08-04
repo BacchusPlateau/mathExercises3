@@ -1686,7 +1686,7 @@ Source: routines.asm
   1453 3607			print_array_loop:
   1454 3607 8A			        txa                             ; a = x
   1455 3608 85 8D		        sta x1                          ; save x to x1 via a
-  1456 360A BD 7A 20		        lda merged,x                   ; a = numbers[x]
+  1456 360A BD 47 20		        lda merged,x                   ; a = numbers[x]
   1457 				        
   1458 360D 20 6E 35		        jsr printDecimal                ; print a
   1459 3610 A9 9B		        lda #$9B                        ; a = newline character
@@ -1717,7 +1717,7 @@ Source: routines.asm
      5 				 
      6 2000			        .proc main
      7 				 
-     8 2000-2089> A9 01 8D F0 +         mva #1 csrhinh                  ; turn cursor off
+     8 2000-2056> A9 01 8D F0 +         mva #1 csrhinh                  ; turn cursor off
      9 2005 A9 01 85 54		        mva #1 rowcrs                   ; start printing at row 1
     10 2009 A9 02 85 55		        mva #2 colcrs                   ; start printing at col 1
     11
@@ -1800,21 +1800,21 @@ Source: routines.asm
     88 				; We will put the value to find in temp_hi
     89 				; We will put the output character (Y/N) in temp_lo
     90
-    91 200D A2 00		        ldx #0                          ; x=0
-    92 200F A9 10 85 84		        mva #16 temp_hi                  ; temp_hi=8 (target value)
-    93 2013 A9 4E 85 83		        mva #n_char temp_lo              ; temp_lo = n_char (default to N)
+    91 				;        ldx #0                          ; x=0
+    92 				;        mva #16 temp_hi                  ; temp_hi=8 (target value)
+    93 				;        mva #n_char temp_lo              ; temp_lo = n_char (default to N)
     94
-    95 2017			probThree:
-    96 2017 BD 6A 20		        lda evens,x                     ; a=evens[x] 
-    97 201A C5 84		        cmp temp_hi
-    98 201C F0 03		        beq probThreeFound
-    99 201E 4C 25 20		        jmp probThreeNotFound
-   100 2021			probThreeFound:
-   101 2021 A9 59 85 83		        mva #y_char temp_lo
-   102 2025			probThreeNotFound:
-   103 2025 E8			        inx                             ; x++
-   104 2026 E0 08		        cpx #.len evens                 ; x == len(evens)?
-   105 2028 D0 ED		        bne probThree                   ; branch if they are not equal
+    95 				;probThree:
+    96 				;        lda evens,x                     ; a=evens[x] 
+    97 				;        cmp temp_hi
+    98 				;        beq probThreeFound
+    99 				;        jmp probThreeNotFound
+   100 				;probThreeFound:
+   101 				;        mva #y_char temp_lo
+   102 				;probThreeNotFound:
+   103 				;        inx                             ; x++
+   104 				;        cpx #.len evens                 ; x == len(evens)?
+   105 				;        bne probThree                   ; branch if they are not equal
    106
    107 				;        lda temp_lo
    108 				;        jsr putchar
@@ -1829,19 +1829,19 @@ Source: routines.asm
    117 				; y will index merged
    118
    119
-   120 202A A2 00		        ldx #0                          ; x=0
-   121 202C A0 00		        ldy #0                          ; y=0
+   120 				 ;       ldx #0                          ; x=0
+   121 				 ;       ldy #0                          ; y=0
    122
-   123 202E			probFour:
-   124 202E BD 72 20		        lda odds,x                     ; a=evens[x] 
-   125 2031 99 7A 20		        sta merged,y
-   126 2034 C8			        iny
-   127 2035 BD 6A 20		        lda evens,x
-   128 2038 99 7A 20		        sta merged,y
-   129 203B C8			        iny
-   130 203C E8			        inx
-   131 203D E0 08		        cpx #.len evens
-   132 203F D0 ED		        bne probFour
+   123 				;probFour:
+   124 				;        lda odds,x                     ; a=evens[x] 
+   125 				;        sta merged,y
+   126 				;        iny
+   127 				;        lda evens,x
+   128 				;        sta merged,y
+   129 				;        iny
+   130 				;        inx
+   131 				;        cpx #.len evens
+   132 				;        bne probFour
    133
    134 				        ;jsr printArray
    135
@@ -1854,54 +1854,131 @@ Source: routines.asm
    142 				; two conditions that both have to pass. Print the count.
    143
    144
-   145 2041 A9 05 85 83		        mva #5 temp_lo                  ; our lower bound will be 5, store in a zero page variable
-   146 2045 A9 0C 85 84		        mva #12 temp_hi                 ; our upper bound will be 12, store in a zero page variable
-   147 2049 A2 00		        ldx #0                          ; index into our byte array evens { 2, 4, 6, 8, 10, 12, 14, 16 }
-   148 204B A0 00		        ldy #0                          ; counter how many we found in range
+   145 				 ;       mva #5 temp_lo                  ; our lower bound will be 5, store in a zero page variable
+   146 				 ;       mva #12 temp_hi                 ; our upper bound will be 12, store in a zero page variable
+   147 				 ;       ldx #0                          ; index into our byte array evens { 2, 4, 6, 8, 10, 12, 14, 16 }
+   148 				 ;       ldy #0                          ; counter how many we found in range
    149
-   150 204D			probFive:
-   151 204D BD 6A 20		        lda evens,x                     ; a=evens[x] 
-   152 2050 C5 83		        cmp temp_lo                     ; a == temp_lo ?
-   153 2052 90 07		        bcc probFiveNext                ; a < temp_lo is below range, skip        
-   154 				        ; if we got here, a >= temp_lo, we must check temp_hi now
-   155 2054 C5 84		        cmp temp_hi                     ; a == temp_hi ?
-   156 2056 90 02		        bcc probFiveGotOne              ; if a < temp_hi, we are in range
+   150 				;robFive:
+   151 				;        lda evens,x                     ; a=evens[x] 
+   152 				;        cmp temp_lo                     ; a == temp_lo ?
+   153 				;        bcc probFiveNext                ; a < temp_lo is below range, skip        
+   154 				;        ; if we got here, a >= temp_lo, we must check temp_hi now
+   155 				;        cmp temp_hi                     ; a == temp_hi ?
+   156 				;        bcc probFiveGotOne              ; if a < temp_hi, we are in range
    157 				        ; if we got here a >= templo and now have to check if a == temp_hi
-   158 2058 D0 01		        bne probFiveNext                ; a != temp_hi
+   158 				;        bne probFiveNext                ; a != temp_hi
    159
-   160 205A			probFiveGotOne:
-   161 205A C8			        iny                             ; y++
+   160 				;probFiveGotOne:
+   161 				;        iny                             ; y++
    162
-   163 205B			probFiveNext:
-   164 205B E8			        inx                             ; x++
-   165 205C E0 08		        cpx #.len evens                 ; x==len(evens) ?
-   166 205E D0 ED		        bne probFive                    ; x != len(evens)
+   163 				;probFiveNext:
+   164 				;        inx                             ; x++
+   165 				;        cpx #.len evens                 ; x==len(evens) ?
+   166 				;        bne probFive                    ; x != len(evens)
    167
-   168 2060 98			        tya                             ; a=y
-   169 2061 20 6E 35		        jsr printDecimal                ; print the output (should be 4)
+   168 				;        tya                             ; a=y
+   169 				;        ;jsr printDecimal                ; print the output (should be 4)
    170
-   171 2064			stop:
-   172 2064 20 7D 33		        jsr fightAttract
-   173 2067 4C 64 20		        jmp stop
-   174
-   175 				        .endp
-   176 				 
-   177 				 
-   178 				 
-   179
-   180 				; Data section
-   181 				;===================================================================
-   182
-   183 206A			        .local evens
-   184 206A 02 04 06 08 0A 0C +         .byte 2, 4, 6, 8, 10, 12, 14, 16
-   185 				        .endl
-   186
-   187 2072			        .local odds
-   188 2072 01 03 05 07 09 0B +         .byte 1, 3, 5, 7, 9, 11, 13, 15
-   189 				        .endl
+   171 				;****************
+   172 				; find min value, where a byte array "mixed" is declared as:
+   173 				;        .local mixed
+   174 				;        .byte 15, 3, 2, 1, 3, 11, 13, 2
+   175 				;        .endl
+   176
+   177 				;        ldx #0                           ; x=0
+   178 				;        mva #254  temp_lo                ; temp_lo=254 (holds the least)
+   179 				;probUno:
+   180 				;        lda mixed,x                      ; a=mixed[x] 
+   181 				;        cmp temp_lo                      ; a == temp_lo 
+   182 				;        bcc probUnoFound                 ; a < temp_lo 
+   183 				 ;       jmp probUnoNext                  ; skip, a is NOT greater than temp_lo
+   184 				;probUnoFound:
+   185 				 ;       sta temp_lo                      ; temp_lo = a
+   186 				;robUnoNext:
+   187 				;        inx                              ; x++
+   188 				;        cpx #.len mixed                   ; x == len(mixed) ?
+   189 				;        bne probUno                      ; x != len(mixed)
    190
-   191 207A			        .local merged
-   192 207A 00 00 00 00 00 00 +         .byte 0, 0, 0, 0, 0,  0,  0,  0, 0, 0, 0, 0, 0,  0,  0,  0
-   193 				        .endl
+   191 				 ;       lda temp_lo                      ; a = temp_lo
+   192 				 ;       jsr printDecimal                 ; print a
+   193
    194
-   195 02E0-02E1> 00 20		        run main
+   195 				;=====================================================================
+   196 				; Count the set bits in a byte
+   197 				; Given a single byte value, count and display how many of its bits are 1.
+   198 				; You must not loop more than 8 times
+   199
+   200 				;        ldy #0                           ; y=0 (our count of bits set)
+   201 				;        ldx #0                           ; x=0 (we still start on the right most bit)
+   202 				;        lda #%01101111                  ; a=binary "#" denotes a literal value, not an address
+   203 				                                        ; "%" denotes a binary value
+   204 				;checkBit:
+   205 				;        asl                             ; left shift
+   206 				;        bcc skipThisBit                 ; if carry flag is clear, this bit was not 1
+   207 				;        iny                             ; y++, if we're here, carry flat was set
+   208 				;skipThisBit:
+   209 				;        inx                             ; x++
+   210 				;        cpx #8                          ; have we shifted 8 times?
+   211 				;        bne checkBit                    ; check the next bit if x !=8
+   212
+   213 				;        tya                             ; a=y
+   214 				;        jsr printDecimal                ; print a
+   215
+   216
+   217
+   218
+   219
+   220 				; Null terminated array
+   221 				; Process a byte array that ends with a $00 terminator instead of using 
+   222 				; .len. Loop until you read a $00, counting the non-zero values as you go. 
+   223 				; Use this array: 
+   224 				; .local evens
+   225 				; .byte 2, 4, 6, 8, 10, 12, 14, 16, 0 
+   226
+   227 200D A2 00		        ldx #0                          ; x=0
+   228 200F A9 00 85 83		        mva #0 temp_lo                  ; we will put the sum in temp_lo
+   229
+   230 2013			keepAdding:
+   231 2013 BD 2E 20		        lda evens, x                    ; a=evens[x]
+   232 2016 C9 00		        cmp #0                          ; a==0 ?
+   233 2018 F0 09		        beq stopAdding                  ; if a==0, branch
+   234 201A 18			        clc                             ; clear the carry flag
+   235 201B 65 83		        adc temp_lo                     ; a+=temp_lo
+   236 201D 85 83		        sta temp_lo                     ; temp_lo=a
+   237 201F E8			        inx                             ; x++
+   238 2020 4C 13 20		        jmp keepAdding                  ; branch 
+   239 2023			stopAdding:
+   240 2023 A5 83		        lda temp_lo                     ; a=temp_lo
+   241 2025 20 6E 35		        jsr printDecimal                ; call print routine to print out the A register
+   242
+   243
+   244 2028			stop:
+   245 2028 20 7D 33		        jsr fightAttract
+   246 202B 4C 28 20		        jmp stop
+   247
+   248 				        .endp
+   249 				 
+   250 				 
+   251 				 
+   252
+   253 				; Data section
+   254 				;===================================================================
+   255
+   256 202E			        .local evens
+   257 202E 02 04 06 08 0A 0C +         .byte 2, 4, 6, 8, 10, 12, 14, 16, 0
+   258 				        .endl
+   259
+   260 2037			        .local odds
+   261 2037 01 03 05 07 09 0B +         .byte 1, 3, 5, 7, 9, 11, 13, 15
+   262 				        .endl
+   263
+   264 203F			        .local mixed
+   265 203F 0F 03 02 01 03 0B +         .byte 15, 3, 2, 1, 3, 11, 13, 2
+   266 				        .endl
+   267
+   268 2047			        .local merged
+   269 2047 00 00 00 00 00 00 +         .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+   270 				        .endl
+   271
+   272 02E0-02E1> 00 20		        run main
