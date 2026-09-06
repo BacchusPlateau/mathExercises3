@@ -1453,7 +1453,7 @@ done_shift:
 print_array_loop:
         txa                             ; a = x
         sta x1                          ; save x to x1 via a
-        lda merged,x                   ; a = numbers[x]
+        lda mixed,x                   ; a = numbers[x]
         
         jsr printDecimal                ; print a
         lda #$9B                        ; a = newline character
@@ -1462,7 +1462,7 @@ print_array_loop:
         lda x1                          ; a = x1 (restoring x)
         tax                             ; x = a
         inx                             ; x++
-        cpx #.len merged               ; is x == len(numbers)?
+        cpx #.len mixed               ; is x == len(numbers)?
         bne print_array_loop            ; "branch if zero flag is clear" 
 
         lda #$9B                        ; a = newline character

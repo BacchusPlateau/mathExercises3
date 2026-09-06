@@ -9,6 +9,148 @@
         mva #1 rowcrs                   ; start printing at row 1
         mva #2 colcrs                   ; start printing at col 1
 
+
+; 1. Find the index of the maximum
+; Like your find-max exercise, but instead of storing the value of the largest element, 
+; store the index (position) where you found it. You'll need two zero-page variables simultaneously — 
+; one tracking the best value seen so far, one tracking which X position it was at. Small conceptual 
+; step up: tracking two things in parallel.
+
+
+ ;       ldx #0                           ; x=0
+ ;       mva #0 temp_lo                  ; temp_lo=0 (max value)
+ ;       mva #0 temp_hi                  ; temp_hi=0 (index of max value)
+
+;findMax:
+;        lda evens,x                     ; a=evens[x] 
+;        cmp temp_lo                     ; a==temp_lo ?
+;        bcc nextFindMax                 ; a<temp_lo
+
+;        sta temp_lo                     ; temp_lo=a (update the max value)
+;        txa                             ; a=x
+;        sta temp_hi                     ; temp_hi=a (update the index into the evens array)
+
+;nextFindMax:
+;        inx                             ; x++
+;        cpx #.len evens                 ; x==len(evens) ?
+;        bne findMax                     ; x!=len(evens)
+
+ ;       lda temp_lo                     ; a=temp_lo
+ ;       jsr printDecimal                ; print max
+
+ ;       lda #new_line                   ; a=$9B (ATASCII newline character)
+ ;       jsr putchar                     ; print a
+
+ ;       lda temp_hi                     ; a=temp_hi
+ ;       jsr printDecimal                ; print index
+
+; 2. Copy only even values to a new buffer
+; Loop over mixed, test each value for evenness using AND #1 (if bit 0 is 0, the number is even), 
+; and copy only the even values into merged.
+
+; mixed is defined as:
+;        .byte 15, 3, 2, 1, 3, 11, 13, 2
+; merged is an empty byte array
+
+;        ldx #0                  ; x=0
+;        ldy #0                  ; y=0
+;fromTheTop:
+;        lda mixed,x             ; a=mixed[x]
+;        and #1                  ; a=a & 1
+;        beq copyValue           ; if the zero flag is set, branch to copyValue
+;        jmp nextValue           ; skip the copy and get ready for the next value to check
+;copyValue:
+;        lda mixed,x             ; a=mixed[x]
+;        sta merged,y            ; merged[y]=a
+;        iny                     ; y++
+;nextValue:
+;        inx                     ; x++
+;        cpx #.len mixed         ; x==len(mixed) ?
+;        bne fromTheTop          ; if x != len(mixed) then branch back to fromTheTop
+;        jsr printArray          ; print the mixed array
+
+
+; 3. Multiply two numbers using repeated addition
+; Given two small values (say 6 and 7), compute their product by adding one value to itself 
+; repeatedly — a loop that counts down from the multiplier to zero, accumulating the result. 
+; Keep both values under 15 so the product stays under 99 and printDecimal works. Introduces 
+; a loop where the loop count itself is a variable, not a constant.
+
+;        mva #6 temp_lo          ; first number - we will add temp_lo to a x times.
+;        ldx #7                  ; x will count down to zero
+;        lda #0                  ; a=0 (a will hold our running sum)
+;loopIt:
+;        clc                     ; clear carry
+;        adc temp_lo             ; a+=temp_lo
+;        dex                     ; x--
+;        beq doneAdding          ; dex sets the zero flag if we are at zero, so check if we're done
+;        jmp loopIt              ; jump to loopIt
+;doneAdding:
+;        jsr printDecimal        ; print a
+
+; 4. Running sum with early exit
+; Sum the evens array but break out of the loop immediately if the running total exceeds a 
+; threshold (say 20). Two different exit paths: normal end-of-array, or threshold hit. After 
+; the loop, print how many elements were actually summed. Good practice for loops with 
+; multiple exit conditions.
+
+;        ldx #0                  ; x=0
+;        mva #0 temp_lo          ; temp_lo=0 (our running total)
+;addNext:
+;        lda evens, x            ; a=evens[x]
+;        clc                     ; clear carry
+;        adc temp_lo             ; a+=temp_lo
+;        cmp #20                 ; a==20 ?
+;        sta temp_lo             ; temp_lo=a
+;        bcs doneWithAdding      ; branch on carry set, so a >= 20
+;        inx                     ; x++
+;        cpx #.len evens         ; x==len(evens) ?
+;        beq doneWithAdding      ; branch if x==len(evens)
+;        jmp addNext             ; loop back up to addNext
+;doneWithAdding:
+;        inx                     ; x++ (we have to account for zero indexing)
+;        txa                     ; a=x
+;        pha                     ; push(a)
+;        lda temp_lo             ; a=temp_lo
+;        jsr printDecimal        ; print the total
+;        lda #new_line           ; a=$9B (ATASCII newline character)
+;        jsr putchar             ; print the newline character
+;        pla                     ; a=pop()
+;        jsr printDecimal        ; print how many items we added
+
+; 5. One pass of bubble sort
+; Compare adjacent pairs in mixed — element[0] vs element[1], element[1] vs element[2], 
+; etc. — and swap them if they're out of order. A swap requires a temporary variable 
+; (load first, store second into first's spot, store temp into second's spot). After one 
+; pass the largest value will have bubbled to the end. Print array with printArray.
+; This is the most complex of the five — nested state, in-place modification, and a 3-step swap.
+
+        ldx #0                  ; x=0
+nextPair:
+        lda mixed, x            ; a=mixed[x]
+        sta temp_lo             ; temp_lo=a
+        inx                     ; x++
+        cpx #.len mixed         ; x==len(mixed) ?
+        beq doneSwapping        ; we're at the end of the array, get out
+        lda mixed, x            ; grab the next value
+        cmp temp_lo             ; a == temp_lo ? (mixed[x+1] == mixed[x] ?)
+        bcc swapPair            ; if carry flag is clear, then a < temp_lo, 
+                                ; which means mixed[x+1] < mixed[x] ... we need to swap
+        jmp nextPair            ; if we fell through, we don't need to swap and we've already moved the index 
+swapPair:
+        ; temp_lo needs to be where mixed[x] is 
+        dex                     ; x--
+        sta mixed, x            ; mixed[x]=a
+        inx                     ; x++
+        lda temp_lo             ; a=temp_lo
+        sta mixed, x            ; mixed[x]=a  
+        jmp nextPair            ; compare next pair
+doneSwapping:
+        jsr printArray          ; print the entire mixed array
+
+
+
+
 ; problem one
 ; Running average (rounded down)
 ; Given a byte table of values, compute their average — sum all the values, 
@@ -243,23 +385,52 @@
 
 
 
+;===============================================================
+; Max minus min
+; Two passes over the same array: first find the maximum, then find the minimum, 
+; then subtract min from max and print the result. Combines exercises #1 and 
+; the earlier find-max, plus an explicit subtraction at the end with sec / sbc. 
+; Use the array mixed:
+; .local mixed
+; .byte 15, 3, 2, 1, 3, 11, 13, 2
+
+;        ldx #0                          ; x=0
+;        mva #$FF temp_lo                ; we will put the min in temp_lo, default it to 255
+;keepLooking4Min:
+;        lda mixed, x                    ; a=mixed[x]
+;        cmp temp_lo                     ; a==temp_lo ?
+;        bcc isLower                     ; if a<temp_lo, branch
+;        jmp nextMinCheck                ; check next value
+;isLower:
+;        sta temp_lo                     ; temp_lo=a
+;nextMinCheck:
+;        inx                             ; x++
+;        cpx #.len mixed                 ; x==len(mixed) ?
+;        bne keepLooking4Min             ; if x!=len(mixed), branch
+;
+;        ldx #0                          ; reset our counter
+;        mva #0 temp_hi                  ; we will put the max in temp_hi, default it to zero
+;keepLooking4Max:
+;        lda mixed, X                    ; a=mixed[x]
+;        cmp temp_hi                     ; a==temp_hi ?
+;        bcs isHigher                    ; if a>temp_hi, branch
+;        jmp nextMaxCheck                ; check next value
+;isHigher:
+;        sta temp_hi                     ; temp_hi=a
+;nextMaxCheck:
+;        inx                             ; x++
+;        cpx #.len mixed                 ; x==len(mixed) ?
+;        bne keepLooking4Max             ; if x!=len(mixed), branch
+
+; now we have min in temp_lo and max in temp_hi
+;        lda temp_hi                     ; a=temp_hi
+;        sec                             ; set the carry flag
+;        sbc temp_lo                     ; a-=temp_lo
+;        jsr printDecimal                ; call print routine to print out the A register, should be 14
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+;        lda temp_lo
+;        jsr printDecimal
 
 
 

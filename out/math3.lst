@@ -1686,7 +1686,7 @@ Source: routines.asm
   1453 3607			print_array_loop:
   1454 3607 8A			        txa                             ; a = x
   1455 3608 85 8D		        sta x1                          ; save x to x1 via a
-  1456 360A BD 47 20		        lda merged,x                   ; a = numbers[x]
+  1456 360A BD 4A 20		        lda mixed,x                   ; a = numbers[x]
   1457 				        
   1458 360D 20 6E 35		        jsr printDecimal                ; print a
   1459 3610 A9 9B		        lda #$9B                        ; a = newline character
@@ -1695,7 +1695,7 @@ Source: routines.asm
   1462 3615 A5 8D		        lda x1                          ; a = x1 (restoring x)
   1463 3617 AA			        tax                             ; x = a
   1464 3618 E8			        inx                             ; x++
-  1465 3619 E0 10		        cpx #.len merged               ; is x == len(numbers)?
+  1465 3619 E0 08		        cpx #.len mixed               ; is x == len(numbers)?
   1466 361B D0 EA		        bne print_array_loop            ; "branch if zero flag is clear" 
   1467
   1468 361D A9 9B		        lda #$9B                        ; a = newline character
@@ -1717,268 +1717,462 @@ Source: routines.asm
      5 				 
      6 2000			        .proc main
      7 				 
-     8 2000-2056> A9 01 8D F0 +         mva #1 csrhinh                  ; turn cursor off
+     8 2000-2061> A9 01 8D F0 +         mva #1 csrhinh                  ; turn cursor off
      9 2005 A9 01 85 54		        mva #1 rowcrs                   ; start printing at row 1
     10 2009 A9 02 85 55		        mva #2 colcrs                   ; start printing at col 1
     11
-    12 				; problem one
-    13 				; Running average (rounded down)
-    14 				; Given a byte table of values, compute their average — sum all the values, 
-    15 				; then repeatedly subtract the count until you can't anymore, counting how many 
-    16 				; times you subtracted. That gives you quotient = average. Print it. 
-    17 				; (This is the same repeated-subtraction trick as `printDecimal`, 
-    18 				; just with a variable divisor instead of 10.)
+    12
+    13 				; 1. Find the index of the maximum
+    14 				; Like your find-max exercise, but instead of storing the value of the largest element, 
+    15 				; store the index (position) where you found it. You'll need two zero-page variables simultaneously — 
+    16 				; one tracking the best value seen so far, one tracking which X position it was at. Small conceptual 
+    17 				; step up: tracking two things in parallel.
+    18
     19
-    20 				 ;       ldx #0                          ; x=0
-    21 				 ;       mva #0 temp_lo                  ; temp_lo=0
-    22
-    23 				;probOne:
-    24 				;        lda evens,x                     ; a=evens[x]
-    25 				;        clc                             ; clear carry
-    26 				;        adc temp_lo                     ; a+=temp_lo
-    27 				;        sta temp_lo                     ; temp_lo=a
-    28 				;        inx                             ; x++
-    29 				;        cpx #.len evens
-    30 				;        bne probOne
-    31 				        ; we've now got how many elements are in the array in x
-    32 				        ; the sum of the array is in temp_lo
-    33 				;        txa                             ; a=x
-    34 				;        ldx #0                          ; x=0 (we're using it now for # of times we can subtract)
-    35 				;        sta p16_val_lo                  ; p16_val_lo=x (the length of the array evens)
-    36
-    37 				;        ; iteratively subtract the array count from the sum until we go negative
-    38 				;probOneDivide:
-    39 				;        lda temp_lo                     ; a=temp_lo (the sum of the array)
-    40 				;        sec                             ; set carry
-    41 				;        sbc p16_val_lo                  ; a-=p16_val_lo (subtract the length of the array)
-    42 				;        sta temp_lo                     ; a=p16_val_lo (store reduced sum in a)
-    43 				;        bmi probOneNegative             ; branch if we've gone negative
-    44 				;        inx                             ; x++
-    45 				;        jmp probOneDivide               ; keep subtracting
-    46 				;probOneNegative:
-    47 				 ;       txa                             ; a=x
-    48 				 ;       jsr printDecimal                ; print the integer division
-    49
+    20 				 ;       ldx #0                           ; x=0
+    21 				 ;       mva #0 temp_lo                  ; temp_lo=0 (max value)
+    22 				 ;       mva #0 temp_hi                  ; temp_hi=0 (index of max value)
+    23
+    24 				;findMax:
+    25 				;        lda evens,x                     ; a=evens[x] 
+    26 				;        cmp temp_lo                     ; a==temp_lo ?
+    27 				;        bcc nextFindMax                 ; a<temp_lo
+    28
+    29 				;        sta temp_lo                     ; temp_lo=a (update the max value)
+    30 				;        txa                             ; a=x
+    31 				;        sta temp_hi                     ; temp_hi=a (update the index into the evens array)
+    32
+    33 				;nextFindMax:
+    34 				;        inx                             ; x++
+    35 				;        cpx #.len evens                 ; x==len(evens) ?
+    36 				;        bne findMax                     ; x!=len(evens)
+    37
+    38 				 ;       lda temp_lo                     ; a=temp_lo
+    39 				 ;       jsr printDecimal                ; print max
+    40
+    41 				 ;       lda #new_line                   ; a=$9B (ATASCII newline character)
+    42 				 ;       jsr putchar                     ; print a
+    43
+    44 				 ;       lda temp_hi                     ; a=temp_hi
+    45 				 ;       jsr printDecimal                ; print index
+    46
+    47 				; 2. Copy only even values to a new buffer
+    48 				; Loop over mixed, test each value for evenness using AND #1 (if bit 0 is 0, the number is even), 
+    49 				; and copy only the even values into merged.
     50
-    51 				;========================================================================================
-    52 				; **2. Negate all values in an array**
-    53 				; Given a table of small positive numbers, replace every value in-place with its two's 
-    54 				; complement negation — i.e. `256 - value`. The 6502 idiom for this is `eor #$FF` followed 
-    55 				; by `clc` / `adc #1` (flip all bits, then add 1). Verify with `db` in Altirra before and after.
-    56
-    57 				;        lda #new_line
-    58 				;        jsr putchar
-    59
-    60 				;       lda #new_line
-    61 				;       jsr putchar
-    62
-    63 				;        jsr printArray
-    64
-    65 				;        ldx #0                          ; x=0
-    66
-    67 				;probTwo:
-    68 				;        lda evens,x                     ; a=evens[x] 
-    69 				;        eor #%11111111                   ; a=a xor (1111 1111)
-    70 				;        clc                             ; clear carry
-    71 				;        adc #1                          ; a+=1
-    72 				;        sta evens,X                     ; evens[x] = a
-    73 				;        inx                             ; x++
-    74 				;        cpx #.len evens                 ; x == len(evens)?
-    75 				;        bne probTwo                     ; branch if they are not equal
-    76
-    77 				;        lda #new_line
-    78 				;        jsr putchar
-    79
-    80 				;        jsr printArray
-    81
-    82 				; **3. Array contains a value (yes/no)**
-    83 				; Loop over a byte table searching for a specific target value. If found, print `Y`; 
-    84 				; if you reach the end without finding it, print `N`. The twist: you need to print 
-    85 				; the result *after* the loop regardless of which exit path you took — think about 
-    86 				; how to carry a "found" flag out of the loop.
-    87 				; 
-    88 				; We will put the value to find in temp_hi
-    89 				; We will put the output character (Y/N) in temp_lo
+    51 				; mixed is defined as:
+    52 				;        .byte 15, 3, 2, 1, 3, 11, 13, 2
+    53 				; merged is an empty byte array
+    54
+    55 				;        ldx #0                  ; x=0
+    56 				;        ldy #0                  ; y=0
+    57 				;fromTheTop:
+    58 				;        lda mixed,x             ; a=mixed[x]
+    59 				;        and #1                  ; a=a & 1
+    60 				;        beq copyValue           ; if the zero flag is set, branch to copyValue
+    61 				;        jmp nextValue           ; skip the copy and get ready for the next value to check
+    62 				;copyValue:
+    63 				;        lda mixed,x             ; a=mixed[x]
+    64 				;        sta merged,y            ; merged[y]=a
+    65 				;        iny                     ; y++
+    66 				;nextValue:
+    67 				;        inx                     ; x++
+    68 				;        cpx #.len mixed         ; x==len(mixed) ?
+    69 				;        bne fromTheTop          ; if x != len(mixed) then branch back to fromTheTop
+    70 				;        jsr printArray          ; print the mixed array
+    71
+    72
+    73 				; 3. Multiply two numbers using repeated addition
+    74 				; Given two small values (say 6 and 7), compute their product by adding one value to itself 
+    75 				; repeatedly — a loop that counts down from the multiplier to zero, accumulating the result. 
+    76 				; Keep both values under 15 so the product stays under 99 and printDecimal works. Introduces 
+    77 				; a loop where the loop count itself is a variable, not a constant.
+    78
+    79 				;        mva #6 temp_lo          ; first number - we will add temp_lo to a x times.
+    80 				;        ldx #7                  ; x will count down to zero
+    81 				;        lda #0                  ; a=0 (a will hold our running sum)
+    82 				;loopIt:
+    83 				;        clc                     ; clear carry
+    84 				;        adc temp_lo             ; a+=temp_lo
+    85 				;        dex                     ; x--
+    86 				;        beq doneAdding          ; dex sets the zero flag if we are at zero, so check if we're done
+    87 				;        jmp loopIt              ; jump to loopIt
+    88 				;doneAdding:
+    89 				;        jsr printDecimal        ; print a
     90
-    91 				;        ldx #0                          ; x=0
-    92 				;        mva #16 temp_hi                  ; temp_hi=8 (target value)
-    93 				;        mva #n_char temp_lo              ; temp_lo = n_char (default to N)
-    94
-    95 				;probThree:
-    96 				;        lda evens,x                     ; a=evens[x] 
-    97 				;        cmp temp_hi
-    98 				;        beq probThreeFound
-    99 				;        jmp probThreeNotFound
-   100 				;probThreeFound:
-   101 				;        mva #y_char temp_lo
-   102 				;probThreeNotFound:
-   103 				;        inx                             ; x++
-   104 				;        cpx #.len evens                 ; x == len(evens)?
-   105 				;        bne probThree                   ; branch if they are not equal
-   106
-   107 				;        lda temp_lo
-   108 				;        jsr putchar
-   109
-   110 				;================================================================================
-   111 				; **4. Interleave two arrays into a third**
-   112 				; Given two same-length source arrays A and B, fill a destination buffer by alternating: 
-   113 				; `A[0], B[0], A[1], B[1], A[2], B[2]...` Verify with `db`. This extends the dual-index 
-   114 				; pattern from the reverse-copy exercise — now you're writing to a *third* index at double the pace of the two readers.
-   115
-   116 				; x will index evens and odds
-   117 				; y will index merged
-   118
-   119
-   120 				 ;       ldx #0                          ; x=0
-   121 				 ;       ldy #0                          ; y=0
-   122
-   123 				;probFour:
-   124 				;        lda odds,x                     ; a=evens[x] 
-   125 				;        sta merged,y
-   126 				;        iny
-   127 				;        lda evens,x
-   128 				;        sta merged,y
-   129 				;        iny
-   130 				;        inx
-   131 				;        cpx #.len evens
-   132 				;        bne probFour
-   133
-   134 				        ;jsr printArray
-   135
-   136
-   137
-   138 				;================================================================================
-   139 				; **5. Count how many values are in a range**
-   140 				; Given a byte table, count how many values fall between a low bound and a high bound 
-   141 				; (inclusive). Uses two `cmp`/`bcc`/`bcs` checks per element — a bit like a gate with 
-   142 				; two conditions that both have to pass. Print the count.
-   143
-   144
-   145 				 ;       mva #5 temp_lo                  ; our lower bound will be 5, store in a zero page variable
-   146 				 ;       mva #12 temp_hi                 ; our upper bound will be 12, store in a zero page variable
-   147 				 ;       ldx #0                          ; index into our byte array evens { 2, 4, 6, 8, 10, 12, 14, 16 }
-   148 				 ;       ldy #0                          ; counter how many we found in range
-   149
-   150 				;robFive:
-   151 				;        lda evens,x                     ; a=evens[x] 
-   152 				;        cmp temp_lo                     ; a == temp_lo ?
-   153 				;        bcc probFiveNext                ; a < temp_lo is below range, skip        
-   154 				;        ; if we got here, a >= temp_lo, we must check temp_hi now
-   155 				;        cmp temp_hi                     ; a == temp_hi ?
-   156 				;        bcc probFiveGotOne              ; if a < temp_hi, we are in range
-   157 				        ; if we got here a >= templo and now have to check if a == temp_hi
-   158 				;        bne probFiveNext                ; a != temp_hi
-   159
-   160 				;probFiveGotOne:
-   161 				;        iny                             ; y++
-   162
-   163 				;probFiveNext:
-   164 				;        inx                             ; x++
-   165 				;        cpx #.len evens                 ; x==len(evens) ?
-   166 				;        bne probFive                    ; x != len(evens)
-   167
-   168 				;        tya                             ; a=y
-   169 				;        ;jsr printDecimal                ; print the output (should be 4)
-   170
-   171 				;****************
-   172 				; find min value, where a byte array "mixed" is declared as:
-   173 				;        .local mixed
-   174 				;        .byte 15, 3, 2, 1, 3, 11, 13, 2
-   175 				;        .endl
-   176
-   177 				;        ldx #0                           ; x=0
-   178 				;        mva #254  temp_lo                ; temp_lo=254 (holds the least)
-   179 				;probUno:
-   180 				;        lda mixed,x                      ; a=mixed[x] 
-   181 				;        cmp temp_lo                      ; a == temp_lo 
-   182 				;        bcc probUnoFound                 ; a < temp_lo 
-   183 				 ;       jmp probUnoNext                  ; skip, a is NOT greater than temp_lo
-   184 				;probUnoFound:
-   185 				 ;       sta temp_lo                      ; temp_lo = a
-   186 				;robUnoNext:
-   187 				;        inx                              ; x++
-   188 				;        cpx #.len mixed                   ; x == len(mixed) ?
-   189 				;        bne probUno                      ; x != len(mixed)
-   190
-   191 				 ;       lda temp_lo                      ; a = temp_lo
-   192 				 ;       jsr printDecimal                 ; print a
-   193
-   194
-   195 				;=====================================================================
-   196 				; Count the set bits in a byte
-   197 				; Given a single byte value, count and display how many of its bits are 1.
-   198 				; You must not loop more than 8 times
-   199
-   200 				;        ldy #0                           ; y=0 (our count of bits set)
-   201 				;        ldx #0                           ; x=0 (we still start on the right most bit)
-   202 				;        lda #%01101111                  ; a=binary "#" denotes a literal value, not an address
-   203 				                                        ; "%" denotes a binary value
-   204 				;checkBit:
-   205 				;        asl                             ; left shift
-   206 				;        bcc skipThisBit                 ; if carry flag is clear, this bit was not 1
-   207 				;        iny                             ; y++, if we're here, carry flat was set
-   208 				;skipThisBit:
-   209 				;        inx                             ; x++
-   210 				;        cpx #8                          ; have we shifted 8 times?
-   211 				;        bne checkBit                    ; check the next bit if x !=8
-   212
-   213 				;        tya                             ; a=y
-   214 				;        jsr printDecimal                ; print a
-   215
-   216
-   217
+    91 				; 4. Running sum with early exit
+    92 				; Sum the evens array but break out of the loop immediately if the running total exceeds a 
+    93 				; threshold (say 20). Two different exit paths: normal end-of-array, or threshold hit. After 
+    94 				; the loop, print how many elements were actually summed. Good practice for loops with 
+    95 				; multiple exit conditions.
+    96
+    97 				;        ldx #0                  ; x=0
+    98 				;        mva #0 temp_lo          ; temp_lo=0 (our running total)
+    99 				;addNext:
+   100 				;        lda evens, x            ; a=evens[x]
+   101 				;        clc                     ; clear carry
+   102 				;        adc temp_lo             ; a+=temp_lo
+   103 				;        cmp #20                 ; a==20 ?
+   104 				;        sta temp_lo             ; temp_lo=a
+   105 				;        bcs doneWithAdding      ; branch on carry set, so a >= 20
+   106 				;        inx                     ; x++
+   107 				;        cpx #.len evens         ; x==len(evens) ?
+   108 				;        beq doneWithAdding      ; branch if x==len(evens)
+   109 				;        jmp addNext             ; loop back up to addNext
+   110 				;doneWithAdding:
+   111 				;        inx                     ; x++ (we have to account for zero indexing)
+   112 				;        txa                     ; a=x
+   113 				;        pha                     ; push(a)
+   114 				;        lda temp_lo             ; a=temp_lo
+   115 				;        jsr printDecimal        ; print the total
+   116 				;        lda #new_line           ; a=$9B (ATASCII newline character)
+   117 				;        jsr putchar             ; print the newline character
+   118 				;        pla                     ; a=pop()
+   119 				;        jsr printDecimal        ; print how many items we added
+   120
+   121 				; 5. One pass of bubble sort
+   122 				; Compare adjacent pairs in mixed — element[0] vs element[1], element[1] vs element[2], 
+   123 				; etc. — and swap them if they're out of order. A swap requires a temporary variable 
+   124 				; (load first, store second into first's spot, store temp into second's spot). After one 
+   125 				; pass the largest value will have bubbled to the end. Print array with printArray.
+   126 				; This is the most complex of the five — nested state, in-place modification, and a 3-step swap.
+   127
+   128 200D A2 00		        ldx #0                  ; x=0
+   129 200F			nextPair:
+   130 200F BD 4A 20		        lda mixed, x            ; a=mixed[x]
+   131 2012 85 83		        sta temp_lo             ; temp_lo=a
+   132 2014 E8			        inx                     ; x++
+   133 2015 E0 08		        cpx #.len mixed         ; x==len(mixed) ?
+   134 2017 F0 17		        beq doneSwapping        ; we're at the end of the array, get out
+   135 2019 BD 4A 20		        lda mixed, x            ; grab the next value
+   136 201C C5 83		        cmp temp_lo             ; a == temp_lo ? (mixed[x+1] == mixed[x] ?)
+   137 201E 90 03		        bcc swapPair            ; if carry flag is clear, then a < temp_lo, 
+   138 				                                ; which means mixed[x+1] < mixed[x] ... we need to swap
+   139 2020 4C 0F 20		        jmp nextPair            ; if we fell through, we don't need to swap and we've already moved the index 
+   140 2023			swapPair:
+   141 				        ; temp_lo needs to be where mixed[x] is 
+   142 2023 CA			        dex                     ; x--
+   143 2024 9D 4A 20		        sta mixed, x            ; mixed[x]=a
+   144 2027 E8			        inx                     ; x++
+   145 2028 A5 83		        lda temp_lo             ; a=temp_lo
+   146 202A 9D 4A 20		        sta mixed, x            ; mixed[x]=a  
+   147 202D 4C 0F 20		        jmp nextPair            ; compare next pair
+   148 2030			doneSwapping:
+   149 2030 20 05 36		        jsr printArray          ; print the entire mixed array
+   150
+   151
+   152
+   153
+   154 				; problem one
+   155 				; Running average (rounded down)
+   156 				; Given a byte table of values, compute their average — sum all the values, 
+   157 				; then repeatedly subtract the count until you can't anymore, counting how many 
+   158 				; times you subtracted. That gives you quotient = average. Print it. 
+   159 				; (This is the same repeated-subtraction trick as `printDecimal`, 
+   160 				; just with a variable divisor instead of 10.)
+   161
+   162 				 ;       ldx #0                          ; x=0
+   163 				 ;       mva #0 temp_lo                  ; temp_lo=0
+   164
+   165 				;probOne:
+   166 				;        lda evens,x                     ; a=evens[x]
+   167 				;        clc                             ; clear carry
+   168 				;        adc temp_lo                     ; a+=temp_lo
+   169 				;        sta temp_lo                     ; temp_lo=a
+   170 				;        inx                             ; x++
+   171 				;        cpx #.len evens
+   172 				;        bne probOne
+   173 				        ; we've now got how many elements are in the array in x
+   174 				        ; the sum of the array is in temp_lo
+   175 				;        txa                             ; a=x
+   176 				;        ldx #0                          ; x=0 (we're using it now for # of times we can subtract)
+   177 				;        sta p16_val_lo                  ; p16_val_lo=x (the length of the array evens)
+   178
+   179 				;        ; iteratively subtract the array count from the sum until we go negative
+   180 				;probOneDivide:
+   181 				;        lda temp_lo                     ; a=temp_lo (the sum of the array)
+   182 				;        sec                             ; set carry
+   183 				;        sbc p16_val_lo                  ; a-=p16_val_lo (subtract the length of the array)
+   184 				;        sta temp_lo                     ; a=p16_val_lo (store reduced sum in a)
+   185 				;        bmi probOneNegative             ; branch if we've gone negative
+   186 				;        inx                             ; x++
+   187 				;        jmp probOneDivide               ; keep subtracting
+   188 				;probOneNegative:
+   189 				 ;       txa                             ; a=x
+   190 				 ;       jsr printDecimal                ; print the integer division
+   191
+   192
+   193 				;========================================================================================
+   194 				; **2. Negate all values in an array**
+   195 				; Given a table of small positive numbers, replace every value in-place with its two's 
+   196 				; complement negation — i.e. `256 - value`. The 6502 idiom for this is `eor #$FF` followed 
+   197 				; by `clc` / `adc #1` (flip all bits, then add 1). Verify with `db` in Altirra before and after.
+   198
+   199 				;        lda #new_line
+   200 				;        jsr putchar
+   201
+   202 				;       lda #new_line
+   203 				;       jsr putchar
+   204
+   205 				;        jsr printArray
+   206
+   207 				;        ldx #0                          ; x=0
+   208
+   209 				;probTwo:
+   210 				;        lda evens,x                     ; a=evens[x] 
+   211 				;        eor #%11111111                   ; a=a xor (1111 1111)
+   212 				;        clc                             ; clear carry
+   213 				;        adc #1                          ; a+=1
+   214 				;        sta evens,X                     ; evens[x] = a
+   215 				;        inx                             ; x++
+   216 				;        cpx #.len evens                 ; x == len(evens)?
+   217 				;        bne probTwo                     ; branch if they are not equal
    218
-   219
-   220 				; Null terminated array
-   221 				; Process a byte array that ends with a $00 terminator instead of using 
-   222 				; .len. Loop until you read a $00, counting the non-zero values as you go. 
-   223 				; Use this array: 
-   224 				; .local evens
-   225 				; .byte 2, 4, 6, 8, 10, 12, 14, 16, 0 
-   226
-   227 200D A2 00		        ldx #0                          ; x=0
-   228 200F A9 00 85 83		        mva #0 temp_lo                  ; we will put the sum in temp_lo
-   229
-   230 2013			keepAdding:
-   231 2013 BD 2E 20		        lda evens, x                    ; a=evens[x]
-   232 2016 C9 00		        cmp #0                          ; a==0 ?
-   233 2018 F0 09		        beq stopAdding                  ; if a==0, branch
-   234 201A 18			        clc                             ; clear the carry flag
-   235 201B 65 83		        adc temp_lo                     ; a+=temp_lo
-   236 201D 85 83		        sta temp_lo                     ; temp_lo=a
-   237 201F E8			        inx                             ; x++
-   238 2020 4C 13 20		        jmp keepAdding                  ; branch 
-   239 2023			stopAdding:
-   240 2023 A5 83		        lda temp_lo                     ; a=temp_lo
-   241 2025 20 6E 35		        jsr printDecimal                ; call print routine to print out the A register
-   242
-   243
-   244 2028			stop:
-   245 2028 20 7D 33		        jsr fightAttract
-   246 202B 4C 28 20		        jmp stop
-   247
-   248 				        .endp
-   249 				 
-   250 				 
-   251 				 
-   252
-   253 				; Data section
-   254 				;===================================================================
-   255
-   256 202E			        .local evens
-   257 202E 02 04 06 08 0A 0C +         .byte 2, 4, 6, 8, 10, 12, 14, 16, 0
-   258 				        .endl
-   259
-   260 2037			        .local odds
-   261 2037 01 03 05 07 09 0B +         .byte 1, 3, 5, 7, 9, 11, 13, 15
-   262 				        .endl
-   263
-   264 203F			        .local mixed
-   265 203F 0F 03 02 01 03 0B +         .byte 15, 3, 2, 1, 3, 11, 13, 2
-   266 				        .endl
-   267
-   268 2047			        .local merged
-   269 2047 00 00 00 00 00 00 +         .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-   270 				        .endl
-   271
-   272 02E0-02E1> 00 20		        run main
+   219 				;        lda #new_line
+   220 				;        jsr putchar
+   221
+   222 				;        jsr printArray
+   223
+   224 				; **3. Array contains a value (yes/no)**
+   225 				; Loop over a byte table searching for a specific target value. If found, print `Y`; 
+   226 				; if you reach the end without finding it, print `N`. The twist: you need to print 
+   227 				; the result *after* the loop regardless of which exit path you took — think about 
+   228 				; how to carry a "found" flag out of the loop.
+   229 				; 
+   230 				; We will put the value to find in temp_hi
+   231 				; We will put the output character (Y/N) in temp_lo
+   232
+   233 				;        ldx #0                          ; x=0
+   234 				;        mva #16 temp_hi                  ; temp_hi=8 (target value)
+   235 				;        mva #n_char temp_lo              ; temp_lo = n_char (default to N)
+   236
+   237 				;probThree:
+   238 				;        lda evens,x                     ; a=evens[x] 
+   239 				;        cmp temp_hi
+   240 				;        beq probThreeFound
+   241 				;        jmp probThreeNotFound
+   242 				;probThreeFound:
+   243 				;        mva #y_char temp_lo
+   244 				;probThreeNotFound:
+   245 				;        inx                             ; x++
+   246 				;        cpx #.len evens                 ; x == len(evens)?
+   247 				;        bne probThree                   ; branch if they are not equal
+   248
+   249 				;        lda temp_lo
+   250 				;        jsr putchar
+   251
+   252 				;================================================================================
+   253 				; **4. Interleave two arrays into a third**
+   254 				; Given two same-length source arrays A and B, fill a destination buffer by alternating: 
+   255 				; `A[0], B[0], A[1], B[1], A[2], B[2]...` Verify with `db`. This extends the dual-index 
+   256 				; pattern from the reverse-copy exercise — now you're writing to a *third* index at double the pace of the two readers.
+   257
+   258 				; x will index evens and odds
+   259 				; y will index merged
+   260
+   261
+   262 				 ;       ldx #0                          ; x=0
+   263 				 ;       ldy #0                          ; y=0
+   264
+   265 				;probFour:
+   266 				;        lda odds,x                     ; a=evens[x] 
+   267 				;        sta merged,y
+   268 				;        iny
+   269 				;        lda evens,x
+   270 				;        sta merged,y
+   271 				;        iny
+   272 				;        inx
+   273 				;        cpx #.len evens
+   274 				;        bne probFour
+   275
+   276 				        ;jsr printArray
+   277
+   278
+   279
+   280 				;================================================================================
+   281 				; **5. Count how many values are in a range**
+   282 				; Given a byte table, count how many values fall between a low bound and a high bound 
+   283 				; (inclusive). Uses two `cmp`/`bcc`/`bcs` checks per element — a bit like a gate with 
+   284 				; two conditions that both have to pass. Print the count.
+   285
+   286
+   287 				 ;       mva #5 temp_lo                  ; our lower bound will be 5, store in a zero page variable
+   288 				 ;       mva #12 temp_hi                 ; our upper bound will be 12, store in a zero page variable
+   289 				 ;       ldx #0                          ; index into our byte array evens { 2, 4, 6, 8, 10, 12, 14, 16 }
+   290 				 ;       ldy #0                          ; counter how many we found in range
+   291
+   292 				;robFive:
+   293 				;        lda evens,x                     ; a=evens[x] 
+   294 				;        cmp temp_lo                     ; a == temp_lo ?
+   295 				;        bcc probFiveNext                ; a < temp_lo is below range, skip        
+   296 				;        ; if we got here, a >= temp_lo, we must check temp_hi now
+   297 				;        cmp temp_hi                     ; a == temp_hi ?
+   298 				;        bcc probFiveGotOne              ; if a < temp_hi, we are in range
+   299 				        ; if we got here a >= templo and now have to check if a == temp_hi
+   300 				;        bne probFiveNext                ; a != temp_hi
+   301
+   302 				;probFiveGotOne:
+   303 				;        iny                             ; y++
+   304
+   305 				;probFiveNext:
+   306 				;        inx                             ; x++
+   307 				;        cpx #.len evens                 ; x==len(evens) ?
+   308 				;        bne probFive                    ; x != len(evens)
+   309
+   310 				;        tya                             ; a=y
+   311 				;        ;jsr printDecimal                ; print the output (should be 4)
+   312
+   313 				;****************
+   314 				; find min value, where a byte array "mixed" is declared as:
+   315 				;        .local mixed
+   316 				;        .byte 15, 3, 2, 1, 3, 11, 13, 2
+   317 				;        .endl
+   318
+   319 				;        ldx #0                           ; x=0
+   320 				;        mva #254  temp_lo                ; temp_lo=254 (holds the least)
+   321 				;probUno:
+   322 				;        lda mixed,x                      ; a=mixed[x] 
+   323 				;        cmp temp_lo                      ; a == temp_lo 
+   324 				;        bcc probUnoFound                 ; a < temp_lo 
+   325 				 ;       jmp probUnoNext                  ; skip, a is NOT greater than temp_lo
+   326 				;probUnoFound:
+   327 				 ;       sta temp_lo                      ; temp_lo = a
+   328 				;robUnoNext:
+   329 				;        inx                              ; x++
+   330 				;        cpx #.len mixed                   ; x == len(mixed) ?
+   331 				;        bne probUno                      ; x != len(mixed)
+   332
+   333 				 ;       lda temp_lo                      ; a = temp_lo
+   334 				 ;       jsr printDecimal                 ; print a
+   335
+   336
+   337 				;=====================================================================
+   338 				; Count the set bits in a byte
+   339 				; Given a single byte value, count and display how many of its bits are 1.
+   340 				; You must not loop more than 8 times
+   341
+   342 				;        ldy #0                           ; y=0 (our count of bits set)
+   343 				;        ldx #0                           ; x=0 (we still start on the right most bit)
+   344 				;        lda #%01101111                  ; a=binary "#" denotes a literal value, not an address
+   345 				                                        ; "%" denotes a binary value
+   346 				;checkBit:
+   347 				;        asl                             ; left shift
+   348 				;        bcc skipThisBit                 ; if carry flag is clear, this bit was not 1
+   349 				;        iny                             ; y++, if we're here, carry flat was set
+   350 				;skipThisBit:
+   351 				;        inx                             ; x++
+   352 				;        cpx #8                          ; have we shifted 8 times?
+   353 				;        bne checkBit                    ; check the next bit if x !=8
+   354
+   355 				;        tya                             ; a=y
+   356 				;        jsr printDecimal                ; print a
+   357
+   358
+   359
+   360
+   361
+   362 				; Null terminated array
+   363 				; Process a byte array that ends with a $00 terminator instead of using 
+   364 				; .len. Loop until you read a $00, counting the non-zero values as you go. 
+   365 				; Use this array: 
+   366 				; .local evens
+   367 				; .byte 2, 4, 6, 8, 10, 12, 14, 16, 0 
+   368
+   369 				;        ldx #0                          ; x=0
+   370 				;        mva #0 temp_lo                  ; we will put the sum in temp_lo
+   371
+   372 				;keepAdding:
+   373 				;        lda evens, x                    ; a=evens[x]
+   374 				;        cmp #0                          ; a==0 ?
+   375 				;        beq stopAdding                  ; if a==0, branch
+   376 				;        clc                             ; clear the carry flag
+   377 				;        adc temp_lo                     ; a+=temp_lo
+   378 				;        sta temp_lo                     ; temp_lo=a
+   379 				;        inx                             ; x++
+   380 				;        jmp keepAdding                  ; branch 
+   381 				;stopAdding:
+   382 				;        lda temp_lo                     ; a=temp_lo
+   383 				;        jsr printDecimal                ; call print routine to print out the A register
+   384
+   385
+   386
+   387
+   388 				;===============================================================
+   389 				; Max minus min
+   390 				; Two passes over the same array: first find the maximum, then find the minimum, 
+   391 				; then subtract min from max and print the result. Combines exercises #1 and 
+   392 				; the earlier find-max, plus an explicit subtraction at the end with sec / sbc. 
+   393 				; Use the array mixed:
+   394 				; .local mixed
+   395 				; .byte 15, 3, 2, 1, 3, 11, 13, 2
+   396
+   397 				;        ldx #0                          ; x=0
+   398 				;        mva #$FF temp_lo                ; we will put the min in temp_lo, default it to 255
+   399 				;keepLooking4Min:
+   400 				;        lda mixed, x                    ; a=mixed[x]
+   401 				;        cmp temp_lo                     ; a==temp_lo ?
+   402 				;        bcc isLower                     ; if a<temp_lo, branch
+   403 				;        jmp nextMinCheck                ; check next value
+   404 				;isLower:
+   405 				;        sta temp_lo                     ; temp_lo=a
+   406 				;nextMinCheck:
+   407 				;        inx                             ; x++
+   408 				;        cpx #.len mixed                 ; x==len(mixed) ?
+   409 				;        bne keepLooking4Min             ; if x!=len(mixed), branch
+   410 				;
+   411 				;        ldx #0                          ; reset our counter
+   412 				;        mva #0 temp_hi                  ; we will put the max in temp_hi, default it to zero
+   413 				;keepLooking4Max:
+   414 				;        lda mixed, X                    ; a=mixed[x]
+   415 				;        cmp temp_hi                     ; a==temp_hi ?
+   416 				;        bcs isHigher                    ; if a>temp_hi, branch
+   417 				;        jmp nextMaxCheck                ; check next value
+   418 				;isHigher:
+   419 				;        sta temp_hi                     ; temp_hi=a
+   420 				;nextMaxCheck:
+   421 				;        inx                             ; x++
+   422 				;        cpx #.len mixed                 ; x==len(mixed) ?
+   423 				;        bne keepLooking4Max             ; if x!=len(mixed), branch
+   424
+   425 				; now we have min in temp_lo and max in temp_hi
+   426 				;        lda temp_hi                     ; a=temp_hi
+   427 				;        sec                             ; set the carry flag
+   428 				;        sbc temp_lo                     ; a-=temp_lo
+   429 				;        jsr printDecimal                ; call print routine to print out the A register, should be 14
+   430
+   431
+   432 				;        lda temp_lo
+   433 				;        jsr printDecimal
+   434
+   435
+   436
+   437
+   438 2033			stop:
+   439 2033 20 7D 33		        jsr fightAttract
+   440 2036 4C 33 20		        jmp stop
+   441
+   442 				        .endp
+   443 				 
+   444 				 
+   445 				 
+   446
+   447 				; Data section
+   448 				;===================================================================
+   449
+   450 2039			        .local evens
+   451 2039 02 04 06 08 0A 0C +         .byte 2, 4, 6, 8, 10, 12, 14, 16, 0
+   452 				        .endl
+   453
+   454 2042			        .local odds
+   455 2042 01 03 05 07 09 0B +         .byte 1, 3, 5, 7, 9, 11, 13, 15
+   456 				        .endl
+   457
+   458 204A			        .local mixed
+   459 204A 0F 03 02 01 03 0B +         .byte 15, 3, 2, 1, 3, 11, 13, 2
+   460 				        .endl
+   461
+   462 2052			        .local merged
+   463 2052 00 00 00 00 00 00 +         .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+   464 				        .endl
+   465
+   466 02E0-02E1> 00 20		        run main
